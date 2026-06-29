@@ -295,8 +295,11 @@ app.get('*', (_req, res) => {
 
 
 // ============ 启动 ============
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏠 Claude Home → http://localhost:${PORT}`)
   console.log(`   Ombre Brain → ${OMBRE_BRAIN}`)
   console.log(`   Static files → ${clientDist}`)
+}).on('error', (e) => {
+  console.error('❌ Server failed to start:', e)
+  process.exit(1)
 })
