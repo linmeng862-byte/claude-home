@@ -255,11 +255,11 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
   const ios = darkMode
     ? { bg: '#0a0a0c', cardBg: 'rgba(28,28,30,0.45)', cardBorder: 'rgba(255,255,255,0.08)',
         text: '#f0eff5', textMuted: '#8e8e93', accent: '#0A84FF', separator: 'rgba(255,255,255,0.06)',
-        dockBg: 'rgba(30,30,32,0.55)', widgetOverlay: 'rgba(0,0,0,0.25)',
+        dockBg: 'rgba(28,28,30,0.45)', widgetOverlay: 'rgba(0,0,0,0.25)',
       }
     : { bg: themeColor || '#F8F8FF', cardBg: 'rgba(255,255,255,0.45)', cardBorder: 'rgba(0,0,0,0.06)',
         text: '#1c1c1e', textMuted: '#8e8e93', accent: '#259CFC', separator: 'rgba(0,0,0,0.06)',
-        dockBg: 'rgba(245,245,247,0.55)', widgetOverlay: 'rgba(0,0,0,0.15)',
+        dockBg: 'rgba(245,245,247,0.45)', widgetOverlay: 'rgba(0,0,0,0.15)',
       }
 
   return (
