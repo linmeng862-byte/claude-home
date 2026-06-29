@@ -1,20 +1,27 @@
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
-# ---- 1. Copy & install client ----
-COPY client/package.json client/package-lock.json ./client/
-COPY client/ ./client/
-RUN cd client && npm install && npm run build
+COPY client ./client
 
-# ---- 2. Copy & install server ----
-COPY server/package.json server/package-lock.json ./server/
-COPY server/ ./server/
-RUN cd server && npm install
+WORKDIR /app/client
 
-# ---- 3. Runtime ----
-ENV PORT=3001
-EXPOSE 3001
+RUN node -v
+RUN npm -v
+RUN npm install
+RUN ls -la node_modules/.bin
+RUN npm run build
+
+WORKDIR /app
+
+COPY server ./server
 
 WORKDIR /app/server
+
+RUN npm install
+
+ENV PORT=3001
+
+EXPOSE 3001
+
 CMD ["node", "index.js"]
