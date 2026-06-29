@@ -2,26 +2,26 @@ FROM node:22-slim
 
 WORKDIR /app
 
-COPY client ./client
+# ---- Client: 先复制依赖描述文件，利用 Docker 缓存 ----
+COPY client/package.json client/package-lock.json ./client/
 
 WORKDIR /app/client
-
-RUN node -v
-RUN npm -v
 RUN npm install
-RUN ls -la node_modules/.bin
+
+# 再复制源码并构建
+COPY client/ ./
 RUN npm run build
 
+# ---- Server ----
 WORKDIR /app
-
-COPY server ./server
+COPY server/package.json server/package-lock.json ./server/
 
 WORKDIR /app/server
-
 RUN npm install
 
+COPY server/ ./
+
+# ---- Runtime ----
 ENV PORT=3001
-
 EXPOSE 3001
-
 CMD ["node", "index.js"]
