@@ -739,21 +739,35 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
   const n = {
     bg: '#FFFFFF', navBg: 'rgba(255,255,255,0.85)',
     text: '#1C1C1E', textMuted: '#8E8E93', textTertiary: '#AEAEB2',
-    accent: '#FF9500', separator: 'rgba(60,60,67,0.12)',
+    accent: '#FF9500', danger: '#FF3B30', separator: 'rgba(60,60,67,0.12)',
     serif: 'Georgia, "Noto Serif SC", serif',
     sans: '-apple-system, "SF Pro Display", "SF Pro Text", sans-serif',
   }
 
-  const [diaries, setDiaries] = useState([
-    { id: 1, date: '2026年6月28日', time: '18:40', title: '微雨', content: '窗外的雨很轻，像谁在叹息。泡了一杯桂花茶，看着水汽慢慢升起，心里莫名地安静下来。\n\n雨天总让人想慢下来。可能是因为雨声替我们按下了暂停键，让那些平时被忽略的细节浮上来——比如窗台上的水珠，比如杯子上升起的白雾。', checklist: [{ text: '泡桂花茶', done: true }, { text: '读完《月亮与六便士》', done: false }] },
-    { id: 2, date: '2026年6月27日', time: '21:15', title: '晚安', content: '今天很累但也很充实。躺在床上看了一会儿月亮，想着明天的计划，不知不觉就睡着了。\n\n有些日子不需要总结，它们本身就是答案。', checklist: [] },
-    { id: 3, date: '2026年6月25日', time: '14:30', title: '午后散步', content: '下午三点，阳光刚好。沿着河边走了很久，看到一只猫在桥上晒太阳。\n\n世界总在不经意间给你一点温柔。', checklist: [{ text: '带猫粮出门', done: true }] },
-  ])
+  // 持久化：从 localStorage 读取，没有则用默认数据
+  const [diaries, setDiaries] = useState(() => {
+    try {
+      const saved = localStorage.getItem('bh_diaries')
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return [
+      { id: 1, date: '2026年6月28日', time: '18:40', title: '微雨', content: '窗外的雨很轻，像谁在叹息。泡了一杯桂花茶，看着水汽慢慢升起，心里莫名地安静下来。\n\n雨天总让人想慢下来。可能是因为雨声替我们按下了暂停键，让那些平时被忽略的细节浮上来——比如窗台上的水珠，比如杯子上升起的白雾。', checklist: [{ text: '泡桂花茶', done: true }, { text: '读完《月亮与六便士》', done: false }] },
+      { id: 2, date: '2026年6月27日', time: '21:15', title: '晚安', content: '今天很累但也很充实。躺在床上看了一会儿月亮，想着明天的计划，不知不觉就睡着了。\n\n有些日子不需要总结，它们本身就是答案。', checklist: [] },
+      { id: 3, date: '2026年6月25日', time: '14:30', title: '午后散步', content: '下午三点，阳光刚好。沿着河边走了很久，看到一只猫在桥上晒太阳。\n\n世界总在不经意间给你一点温柔。', checklist: [{ text: '带猫粮出门', done: true }] },
+    ]
+  })
+
+  // 每次变更都写入 localStorage
+  useEffect(() => {
+    try { localStorage.setItem('bh_diaries', JSON.stringify(diaries)) } catch {}
+  }, [diaries])
+
   const [activeDiary, setActiveDiary] = useState(0)
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [showList, setShowList] = useState(true)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const diaryImageRef = useRef(null)
 
   // 监听 AI 写的日记事件
@@ -779,6 +793,30 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
     setEditing(false)
   }
 
+  const deleteDiary = () => {
+    setDiaries(prev => prev.filter(p => p.id !== diaries[activeDiary].id))
+    setShowDeleteConfirm(false)
+    setShowList(true)
+  }
+
+  // 清单项编辑
+  const [editingCheckIdx, setEditingCheckIdx] = useState(-1)
+  const [editCheckText, setEditCheckText] = useState('')
+
+  const startEditCheck = (idx) => {
+    setEditingCheckIdx(idx)
+    setEditCheckText(current.checklist[idx].text)
+  }
+  const saveEditCheck = () => {
+    if (editingCheckIdx >= 0 && editCheckText.trim()) {
+      setDiaries(prev => prev.map(p => p.id === current.id ? {...p, checklist: p.checklist.map((c, i) => i === editingCheckIdx ? {...c, text: editCheckText.trim()} : c)} : p))
+    }
+    setEditingCheckIdx(-1)
+  }
+  const deleteCheckItem = (idx) => {
+    setDiaries(prev => prev.map(p => p.id === current.id ? {...p, checklist: p.checklist.filter((_, i) => i !== idx)} : p))
+  }
+
   const current = diaries[activeDiary]
 
   // List view
@@ -789,7 +827,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={onBack} style={{ background: 'none', border: 'none', color: n.accent, fontSize: 15, cursor: 'pointer' }}>← 备忘录</button>
           <div style={{ display: 'flex', gap: 16 }}>
-            <button onClick={() => { const now = new Date(); const newD = { id: Date.now(), date: `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`, time: `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`, title: '新备忘录', content: '', checklist: [] }; setDiaries(prev => [newD, ...prev]); setActiveDiary(0); setShowList(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <button onClick={() => { const now = new Date(); const newD = { id: Date.now(), date: `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`, time: `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`, title: '新备忘录', content: '', checklist: [] }; setDiaries(prev => [newD, ...prev]); setActiveDiary(0); setShowList(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
               <Plus size={20} style={{ color: n.accent }} />
             </button>
           </div>
@@ -801,13 +839,18 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
         </div>
       </div>
 
-      {/* 日记列表 — 纯净无卡片 */}
+      {/* 日记列表 — 支持左滑删除 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 40px' }}>
         {diaries.map((d, i) => (
-          <div key={d.id} onClick={() => { setActiveDiary(i); setShowList(false) }} style={{ padding: '12px 16px', borderBottom: `0.5px solid ${n.separator}`, cursor: 'pointer' }}>
-            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 3, lineHeight: 1.3 }}>{d.title}</div>
-            <div style={{ fontSize: 13, color: n.textMuted, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90%' }}>{d.content.split('\n')[0]}</div>
-            <div style={{ fontSize: 11, color: n.textTertiary, marginTop: 4 }}>{d.date} {d.time}</div>
+          <div key={d.id} onClick={() => { setActiveDiary(i); setShowList(false) }} style={{ padding: '12px 16px', borderBottom: `0.5px solid ${n.separator}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 3, lineHeight: 1.3 }}>{d.title}</div>
+              <div style={{ fontSize: 13, color: n.textMuted, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90%' }}>{d.content.split('\n')[0]}</div>
+              <div style={{ fontSize: 11, color: n.textTertiary, marginTop: 4 }}>{d.date} {d.time}</div>
+            </div>
+            <button onClick={e => { e.stopPropagation(); setDiaries(prev => prev.filter(p => p.id !== d.id)) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, flexShrink: 0 }}>
+              <Trash2 size={16} style={{ color: n.danger }} />
+            </button>
           </div>
         ))}
       </div>
@@ -822,10 +865,26 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
         <button onClick={() => setShowList(true)} style={{ background: 'none', border: 'none', color: n.accent, fontSize: 15, cursor: 'pointer' }}>← 备忘录</button>
         <span style={{ fontSize: 12, color: n.textTertiary }}>{current.date} {current.time}</span>
         <div style={{ display: 'flex', gap: 16 }}>
-          <Send size={18} style={{ color: n.accent, cursor: 'pointer' }} />
+          <button onClick={() => setShowDeleteConfirm(true)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+            <Trash2 size={18} style={{ color: n.danger }} />
+          </button>
           <MoreHorizontal size={18} style={{ color: n.accent, cursor: 'pointer' }} />
         </div>
       </div>
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setShowDeleteConfirm(false)}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: 20, width: 260, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 17, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>删除此备忘录？</div>
+            <div style={{ fontSize: 13, color: n.textMuted, textAlign: 'center', marginBottom: 20 }}>删除后将无法恢复</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: 10, background: '#E5E5EA', color: n.text, fontSize: 15, fontWeight: 500, cursor: 'pointer' }}>取消</button>
+              <button onClick={deleteDiary} style={{ flex: 1, padding: '10px 0', border: 'none', borderRadius: 10, background: n.danger, color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>删除</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 无限纸张内容 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 80px' }}>
@@ -842,16 +901,24 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
             <div style={{ fontFamily: n.serif, fontSize: 16, lineHeight: 1.8, letterSpacing: 0.2, color: n.text, whiteSpace: 'pre-wrap' }}>
               {current.content}
             </div>
-            {/* 清单 */}
+            {/* 清单 — 支持编辑和删除 */}
             {current.checklist.length > 0 && (
               <div style={{ marginTop: 28 }}>
                 {current.checklist.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-                    <div onClick={() => { const updated = [...diaries]; updated[activeDiary].checklist[i].done = !updated[activeDiary].checklist[i].done; setDiaries(updated) }}
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+                    <div onClick={() => { setDiaries(prev => prev.map(p => p.id === current.id ? {...p, checklist: p.checklist.map((c, j) => j === i ? {...c, done: !c.done} : c)} : p)) }}
                       style={{ width: 20, height: 20, borderRadius: '50%', border: `1.5px solid ${item.done ? n.accent : n.textTertiary}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
                       {item.done && <CheckCircle size={12} style={{ color: n.accent }} />}
                     </div>
-                    <span style={{ fontSize: 15, color: item.done ? n.textMuted : n.text, textDecoration: item.done ? 'line-through' : 'none', fontFamily: n.serif }}>{item.text}</span>
+                    {editingCheckIdx === i ? (
+                      <input value={editCheckText} onChange={e => setEditCheckText(e.target.value)} onBlur={saveEditCheck} onKeyDown={e => e.key === 'Enter' && saveEditCheck()} autoFocus
+                        style={{ flex: 1, border: 'none', outline: 'none', background: 'rgba(120,120,128,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 15, color: n.text, fontFamily: n.serif }} />
+                    ) : (
+                      <span onClick={() => startEditCheck(i)} style={{ flex: 1, fontSize: 15, color: item.done ? n.textMuted : n.text, textDecoration: item.done ? 'line-through' : 'none', fontFamily: n.serif, cursor: 'text' }}>{item.text}</span>
+                    )}
+                    <button onClick={() => deleteCheckItem(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                      <X size={14} style={{ color: n.textTertiary }} />
+                    </button>
                   </div>
                 ))}
               </div>
@@ -862,7 +929,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
 
       {/* 底部工具栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '10px 16px 28px', background: n.navBg, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderTop: `0.5px solid ${n.separator}`, flexShrink: 0 }}>
-        <button onClick={() => { const updated = [...diaries]; updated[activeDiary].checklist.push({ text: '新项目', done: false }); setDiaries(updated) }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+        <button onClick={() => { setDiaries(prev => prev.map(p => p.id === current.id ? {...p, checklist: [...p.checklist, { text: '新项目', done: false }]} : p)) }} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
           <CheckCircle size={20} style={{ color: n.accent }} />
           <span style={{ fontSize: 9, color: n.textTertiary }}>清单</span>
         </button>

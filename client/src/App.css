@@ -32,8 +32,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe 
   overflow: hidden;
 }
 .ios-clock {
-  font-size: min(22vw, 140px); font-weight: 200; letter-spacing: -4px;
-  text-align: center; line-height: 1;
+  font-size: min(24vw, 150px); font-weight: 200; letter-spacing: -4px;
+  text-align: center; line-height: 0.85;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
