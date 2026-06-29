@@ -1,20 +1,22 @@
 FROM node:22-slim
 
+# 修复 npm 10.x 的 "Exit handler never called" bug
+RUN npm install -g npm@latest
+
 WORKDIR /app
 
-# ---- Client: 先复制依赖描述文件，利用 Docker 缓存 ----
-COPY client/package.json client/package-lock.json ./client/
+# ---- Client ----
+COPY client/package.json ./client/
 
 WORKDIR /app/client
-RUN npm install
+RUN npm install --legacy-peer-deps
 
-# 再复制源码并构建
 COPY client/ ./
 RUN npm run build
 
 # ---- Server ----
 WORKDIR /app
-COPY server/package.json server/package-lock.json ./server/
+COPY server/package.json ./server/
 
 WORKDIR /app/server
 RUN npm install
