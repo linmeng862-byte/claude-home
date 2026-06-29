@@ -11,7 +11,7 @@ app.use(express.json({ limit: '10mb' }))
 
 // ============ 配置 ============
 const OMBRE_BRAIN = process.env.OMBRE_BRAIN_URL || 'https://ye-ombre-brain.zeabur.app'
-const PORT = process.env.PORT || 3001
+const PORT = parseInt(process.env.WEB_PORT, 10) || parseInt(process.env.PORT, 10) || 3001
 
 // ============ 静态文件 — 生产环境 serve 前端 ============
 const clientDist = join(__dirname, '..', 'client', 'dist')
