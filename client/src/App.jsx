@@ -455,7 +455,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
   const callLLM = async (userMessages) => {
     const cfg = config||{}
     if(!cfg.endpoint||!cfg.apiKey) return null
-    const res = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:userMessages,config:{format:cfg.apiFormat||'openai',endpoint:cfg.endpoint,model:cfg.apiModel||'',apiKey:cfg.apiKey,charName:cfg.aiName||'Claude',userName:cfg.userName||'你',systemPrompt:cfg.systemPrompt||'',memoryContext}})})
+    const res = await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:userMessages,config:{format:cfg.apiFormat||'openai',endpoint:cfg.endpoint,model:cfg.apiModel||'',apiKey:cfg.apiKey,charName:cfg.aiName||'Claude',userName:cfg.userName||'你',systemPrompt:cfg.systemPrompt||'',memoryContext,enableThinking:cfg.apiFormat==='anthropic'?true:false}})})
     if(!res.ok) throw new Error('LLM 请求失败')
     return res.body
   }

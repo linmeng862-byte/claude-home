@@ -168,6 +168,25 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     if (config.format === 'anthropic') {
+      // Anthropic: extended thinking 和 tools 互斥，优先 thinking
+      const enableThinking = config.enableThinking !== false
+      const reqBody = {
+        model: config.model || 'claude-sonnet-4-20250514',
+        max_tokens: 16000,
+        stream: true,
+        system: systemPrompt,
+        messages: messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+      }
+      if (enableThinking) {
+        reqBody.thinking = { type: 'enabled', budget_tokens: 10000 }
+      } else {
+        reqBody.tools = [
+          { name: 'get_current_time', description: '获取当前时间', input_schema: { type: 'object', properties: {} } },
+          { name: 'save_memory', description: '保存重要内容到记忆库', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
+          { name: 'post_moment', description: '发朋友圈', input_schema: { type: 'object', properties: { content: { type: 'string', description: '朋友圈内容' } }, required: ['content'] } },
+          { name: 'write_diary', description: '写日记', input_schema: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } },
+        ]
+      }
       const r = await fetch(config.endpoint, {
         method: 'POST',
         headers: {
@@ -176,19 +195,7 @@ app.post('/api/chat', async (req, res) => {
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify({
-          model: config.model || 'claude-sonnet-4-20250514',
-          max_tokens: 4096,
-          stream: true,
-          system: systemPrompt,
-          messages: messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
-          tools: [
-            { name: 'get_current_time', description: '获取当前时间', input_schema: { type: 'object', properties: {} } },
-            { name: 'save_memory', description: '保存重要内容到记忆库', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
-            { name: 'post_moment', description: '发朋友圈', input_schema: { type: 'object', properties: { content: { type: 'string', description: '朋友圈内容' } }, required: ['content'] } },
-            { name: 'write_diary', description: '写日记', input_schema: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } },
-          ],
-        }),
+        body: JSON.stringify(reqBody),
       })
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
