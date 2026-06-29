@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.codeflicker
+.env
+*.local
+*.pdf
+*.docx
+1_docx_extracted
+claude_docx_extracted
+ios_docx_extracted
+UI参考
+OMBRE_BRAIN_API.md

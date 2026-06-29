@@ -1,0 +1,15 @@
+{
+  "name": "claude-home",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "postinstall": "npm install --prefix client && npm install --prefix server",
+    "build": "npm run build --prefix client",
+    "start": "node server/index.js",
+    "dev:client": "npx vite --prefix client -- --host 0.0.0.0 --port 5173",
+    "dev:server": "node --watch server/index.js"
+  }
+}

@@ -1,0 +1,516 @@
+/* ============ Reset ============ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.custom-bg { position: fixed; inset: 0; background-size: cover; background-position: center; opacity: 0.12; pointer-events: none; z-index: 0; }
+
+/* ============ iOS Home Screen ============ */
+.ios-home {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  transition: background 0.35s, color 0.35s;
+}
+/* 自定义背景图 */
+.ios-home-bg {
+  position: fixed; inset: 0; background-size: cover; background-position: center;
+  z-index: 0; pointer-events: none;
+}
+.ios-home-scroll {
+  flex: 1; overflow-y: auto; padding: 0 20px 100px;
+  -webkit-overflow-scrolling: touch;
+  position: relative; z-index: 1;
+}
+
+/* 实时时钟 — 占1/3屏幕高度 + 液态玻璃磨砂质感 */
+.ios-clock-wrap {
+  height: 33.4vh; min-height: 220px;
+  border-radius: 28px; margin-bottom: 16px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(28px) saturate(1.8);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.ios-clock {
+  font-size: min(22vw, 140px); font-weight: 200; letter-spacing: -4px;
+  text-align: center; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+.ios-clock-date {
+  font-size: 14px; font-weight: 400; margin-top: 4px;
+  text-align: center;
+}
+.ios-widget-img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.ios-widget-placeholder {
+  width: 100%; height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+}
+
+/* 两个并列大圆角正方形照片小组件 — 左右均匀贴边 */
+.ios-widget-row {
+  display: flex; justify-content: space-between; gap: 14px; margin-bottom: 14px;
+  padding: 0 4px;
+}
+.ios-photo-widget-sq {
+  width: calc(50% - 7px); aspect-ratio: 1 / 1; border-radius: 22px; overflow: hidden;
+  cursor: pointer; position: relative;
+  backdrop-filter: blur(16px);
+  transition: transform 0.12s, box-shadow 0.15s;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  max-height: 200px;
+}
+.ios-photo-widget-sq:active { transform: scale(0.96); }
+.ios-music-widget {
+  display: flex; align-items: center; gap: 10px;
+  height: 50px; border-radius: 16px; padding: 0 12px;
+  margin-bottom: 10px; cursor: pointer; position: relative;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  transition: transform 0.12s;
+}
+.ios-music-widget:active { transform: scale(0.97); }
+
+.ios-music-cover {
+  width: 38px; height: 38px; border-radius: 9px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(128,128,128,0.1); flex-shrink: 0;
+}
+.ios-music-cover-img { width: 100%; height: 100%; object-fit: cover; }
+
+.ios-music-info { flex: 1; min-width: 0; }
+.ios-music-title { font-size: 13px; font-weight: 600; line-height: 1.2; }
+.ios-music-sub { font-size: 10px; margin-top: 1px; }
+
+.ios-music-actions { display: flex; align-items: center; gap: 6px; }
+.ios-music-icon-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; background: rgba(128,128,128,0.06);
+  border-radius: 50%; cursor: pointer; transition: background 0.12s;
+}
+.ios-music-icon-btn:hover { background: rgba(128,128,128,0.12); }
+
+/* 日历小组件 — Apple Calendar Widget */
+.ios-calendar-widget {
+  border-radius: 28px; padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.ios-app-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 18px 0; padding: 0 4px; margin-bottom: 20px;
+}
+.ios-app-icon-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  cursor: pointer;
+}
+.ios-app-icon-wrap:active .ios-app-icon { transform: scale(0.88); }
+
+.ios-app-icon {
+  width: 58px; height: 58px; border-radius: 14px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: transform 0.12s;
+}
+.ios-app-icon-img {
+  width: 48px; height: 48px; object-fit: contain; border-radius: 8px;
+}
+.ios-app-label {
+  font-size: 10.5px; font-weight: 400; text-align: center;
+  max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 昼夜/颜色控制 */
+.ios-home-controls {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 12px 0; margin-top: 4px;
+}
+.ios-mode-btn {
+  padding: 5px 12px; border: none; background: transparent;
+  cursor: pointer; font-size: 13px; border-radius: 8px;
+  transition: all 0.15s;
+}
+.ios-mode-btn:hover { background: rgba(128,128,128,0.06); }
+.ios-color-dots { display: flex; gap: 6px; margin-left: 6px; }
+.ios-color-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  cursor: pointer; transition: border 0.15s, transform 0.1s;
+}
+.ios-color-dot:active { transform: scale(0.88); }
+
+/* 背景上传圆点 */
+.ios-bg-dot {
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.ios-bg-dot:hover { border-style: solid !important; }
+
+/* 底部 Dock — 磨砂玻璃半透明 */
+.ios-dock {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  height: 92px; padding: 0 24px;
+  display: flex; align-items: center; justify-content: center; gap: 28px;
+  z-index: 50;
+  border-radius: 28px;
+  margin-bottom: 16px;
+}
+.ios-dock-frost {
+  backdrop-filter: blur(40px) saturate(1.6) brightness(1.02);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6) brightness(1.02);
+  border: 0.5px solid rgba(255,255,255,0.2);
+  box-shadow:
+    0 2px 16px rgba(0,0,0,0.08),
+    0 8px 24px rgba(0,0,0,0.04),
+    inset 0 0.5px 0 rgba(255,255,255,0.3);
+}
+.ios-dock-dark.ios-dock-frost {
+  border-color: rgba(255,255,255,0.1);
+  box-shadow:
+    0 2px 20px rgba(0,0,0,0.2),
+    0 8px 32px rgba(0,0,0,0.12),
+    inset 0 0.5px 0 rgba(255,255,255,0.15);
+}
+.ios-dock-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  cursor: pointer;
+}
+.ios-dock-item:active .ios-dock-icon { transform: scale(0.88); }
+
+.ios-dock-icon {
+  width: 54px; height: 54px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  transition: transform 0.12s;
+}
+.ios-dock-icon-img {
+  width: 54px; height: 54px; object-fit: cover; border-radius: 14px;
+}
+.ios-dock-label {
+  font-size: 10px; font-weight: 400; text-align: center;
+}
+
+/* ============ 唱片旋转动画 ============ */
+@keyframes discSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.disc-spinning { animation: discSpin 3s linear infinite; }
+@media(prefers-reduced-motion:reduce) { .disc-spinning { animation: none; } }
+
+/* ============ Premium Companion Chat ============ */
+.ch-chat { display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: -apple-system, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif; }
+
+/* --- Navigation Bar --- */
+.ch-nav { display: flex; align-items: center; padding: 8px 16px; height: 56px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); flex-shrink: 0; border-bottom: 0.5px solid rgba(60,60,67,0.12); }
+.ch-nav-back { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: none; background: transparent; cursor: pointer; border-radius: 8px; flex-shrink: 0; }
+.ch-nav-back:hover { background: rgba(128,128,128,0.08); }
+.ch-nav-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
+.ch-nav-avatar { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; margin-bottom: 2px; flex-shrink: 0; }
+.ch-nav-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ch-nav-name { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; display: flex; align-items: center; gap: 4px; }
+.ch-nav-status { font-size: 11px; font-weight: 400; opacity: 0.5; margin-top: -1px; }
+.ch-nav-badge { width: 14px; height: 14px; border-radius: 50%; background: #2D8CFF; display: flex; align-items: center; justify-content: center; }
+.ch-nav-badge svg { width: 8px; height: 8px; }
+.ch-nav-right { display: flex; gap: 4px; align-items: center; }
+
+/* --- Messages Area --- */
+.ch-messages { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.ch-msg-list { padding: 8px 16px 24px; }
+
+/* Date Separator */
+.ch-date-sep { text-align: center; padding: 20px 0 16px; font-size: 12px; font-weight: 500; letter-spacing: 0.2px; opacity: 0.45; }
+
+/* --- Message Row --- */
+.ch-msg { display: flex; flex-direction: column; animation: chMsgIn 0.28s ease-out; }
+.ch-msg.out { align-items: flex-end; }
+.ch-msg.in { align-items: flex-start; }
+
+/* Consecutive same sender — tight */
+.ch-msg.out + .ch-msg.out,
+.ch-msg.in + .ch-msg.in { margin-top: 2px; }
+/* Different sender — generous gap */
+.ch-msg.out + .ch-msg.in,
+.ch-msg.in + .ch-msg.out { margin-top: 20px; }
+
+/* --- Bubble --- */
+.ch-bubble-row { display: flex; align-items: flex-end; gap: 8px; max-width: 88%; }
+.ch-msg.out .ch-bubble-row { justify-content: flex-end; flex-direction: row-reverse; }
+.ch-msg.in .ch-bubble-row { justify-content: flex-start; }
+
+.ch-bubble {
+  max-width: 72vw; padding: 12px 16px; border-radius: 24px;
+  font-size: 17px; line-height: 1.45; letter-spacing: -0.2px;
+  position: relative; word-break: break-word; min-width: 48px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+}
+.ch-bubble p { margin: 0 0 2px; }
+.ch-bubble p:last-child { margin-bottom: 0; }
+
+/* Outgoing bubble */
+.ch-msg.out .ch-bubble {
+  background: #2D8CFF; color: #fff;
+  border-bottom-right-radius: 8px;
+}
+/* Incoming bubble */
+.ch-msg.in .ch-bubble {
+  background: #fff; color: #1c1c1e;
+  border: 0.5px solid #ECECEC;
+  border-bottom-left-radius: 8px;
+}
+
+/* Bubble tail — subtle rounded nub */
+.ch-msg.out .ch-bubble::after {
+  content: ''; position: absolute; right: -4px; bottom: 0;
+  width: 12px; height: 16px;
+  background: #2D8CFF;
+  border-bottom-left-radius: 12px;
+  clip-path: path('M0,0 C0,0 0,16 12,16 L0,16 Z');
+}
+.ch-msg.in .ch-bubble::after {
+  content: ''; position: absolute; left: -4px; bottom: 0;
+  width: 12px; height: 16px;
+  background: #fff;
+  border-bottom-right-radius: 12px;
+  clip-path: path('M12,0 C12,0 12,16 0,16 L12,16 Z');
+}
+/* Hide tail on consecutive same-direction bubbles */
+.ch-msg.out + .ch-msg.out .ch-bubble::after,
+.ch-msg.in + .ch-msg.in .ch-bubble::after { display: none; }
+
+/* --- Metadata (inside bubble) --- */
+.ch-meta {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 4px; margin-top: 4px; font-size: 11px; font-weight: 500;
+  opacity: 0.55; white-space: nowrap;
+}
+.ch-msg.out .ch-meta { color: rgba(255,255,255,0.7); }
+.ch-msg.in .ch-meta { color: rgba(60,60,67,0.5); }
+
+/* Double-check icon (Telegram style — single composed icon) */
+.ch-doublecheck { display: inline-flex; align-items: center; position: relative; width: 14px; height: 10px; }
+.ch-doublecheck::before,
+.ch-doublecheck::after { content: ''; position: absolute; height: 7px; width: 1.5px; border-radius: 1px; transform-origin: bottom left; }
+.ch-doublecheck::before { transform: rotate(-45deg); left: 1px; bottom: 0; }
+.ch-doublecheck::after { transform: rotate(-45deg); left: 5px; bottom: 0; }
+.ch-msg.out .ch-doublecheck::before,
+.ch-msg.out .ch-doublecheck::after { background: rgba(255,255,255,0.6); }
+.ch-msg.in .ch-doublecheck::before,
+.ch-msg.in .ch-doublecheck::after { background: rgba(60,60,67,0.4); }
+
+/* Thinking chain pill */
+.ch-thinking-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; margin-bottom: 4px; align-self: flex-start;
+  background: rgba(45,140,255,0.06); border: 0.5px solid rgba(45,140,255,0.15);
+  border-radius: 14px; cursor: pointer; transition: all 0.2s;
+}
+.ch-thinking-btn:hover { background: rgba(45,140,255,0.1); }
+.ch-thinking-btn span { font-size: 12px; font-weight: 500; color: #2D8CFF; }
+
+/* --- Typing Indicator --- */
+.ch-typing { display: flex; gap: 4px; padding: 14px 18px; align-items: center; }
+.ch-typing-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  animation: chTypingBounce 1.4s ease-in-out infinite;
+}
+.ch-typing-dot:nth-child(2) { animation-delay: 0.16s; }
+.ch-typing-dot:nth-child(3) { animation-delay: 0.32s; }
+@keyframes chTypingBounce { 0%,60%,100%{transform:translateY(0);opacity:0.25} 30%{transform:translateY(-4px);opacity:1} }
+
+/* Message fade-in */
+@keyframes chMsgIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* --- Avatar (small, beside bubble) --- */
+.ch-avatar {
+  width: 32px; height: 32px; border-radius: 50%; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-bottom: 2px;
+}
+.ch-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* --- Floating Composer --- */
+.ch-composer {
+  padding: 8px 12px 28px; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid rgba(60,60,67,0.1); flex-shrink: 0;
+}
+.ch-composer-inner {
+  display: flex; align-items: flex-end; gap: 6px;
+  background: rgba(255,255,255,0.88); border: 0.5px solid rgba(60,60,67,0.1);
+  border-radius: 22px; padding: 6px 8px; min-height: 44px;
+}
+.ch-composer-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: none; background: transparent;
+  cursor: pointer; border-radius: 50%; flex-shrink: 0; transition: opacity 0.15s;
+  opacity: 0.4;
+}
+.ch-composer-icon:hover { opacity: 0.7; background: rgba(0,0,0,0.04); }
+
+.ch-composer-field {
+  flex: 1; border: none; outline: none; resize: none;
+  font-size: 17px; line-height: 1.45; background: transparent;
+  font-family: inherit; max-height: 100px; padding: 6px 4px;
+  letter-spacing: -0.2px;
+}
+.ch-composer-field::placeholder { color: rgba(60,60,67,0.3); font-weight: 400; }
+
+.ch-send-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: none; border-radius: 50%;
+  cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+  background: #2D8CFF; color: #fff; opacity: 0.3;
+}
+.ch-send-btn.active { opacity: 1; }
+.ch-send-btn.active:hover { transform: scale(1.08); }
+.ch-send-btn:disabled { cursor: not-allowed; }
+
+/* --- Thinking Bottom Sheet --- */
+.ch-sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+  z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+  animation: fadeIn 0.2s;
+}
+.ch-sheet {
+  width: 100%; max-width: 500px; max-height: 90vh;
+  background: #fff; border-radius: 16px 16px 0 0;
+  padding: 0 0 32px; display: flex; flex-direction: column;
+  animation: chSheetUp 0.35s cubic-bezier(0.32,0.72,0,1);
+}
+.ch-sheet-handle { display: flex; justify-content: center; padding: 8px 0 4px; }
+.ch-sheet-handle div { width: 36px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.12); }
+.ch-sheet-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 16px 12px; border-bottom: 0.5px solid rgba(60,60,67,0.1);
+}
+.ch-sheet-title { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+.ch-sheet-close { background: none; border: none; cursor: pointer; font-size: 18px; color: rgba(60,60,67,0.3); padding: 4px; }
+.ch-sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px; font-size: 14px; line-height: 1.8; white-space: pre-wrap; color: #6e6e73; font-family: -apple-system, "SF Pro Text", sans-serif; }
+@keyframes chSheetUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+
+/* --- Dark mode overrides --- */
+.ch-chat.dark .ch-nav { border-color: rgba(255,255,255,0.08); }
+.ch-chat.dark .ch-msg.in .ch-bubble { background: #2c2c2e; color: #e5e5ea; border-color: rgba(255,255,255,0.08); }
+.ch-chat.dark .ch-msg.in .ch-bubble::after { background: #2c2c2e; }
+.ch-chat.dark .ch-msg.in .ch-meta { color: rgba(255,255,255,0.35); }
+.ch-chat.dark .ch-msg.in .ch-doublecheck::before,
+.ch-chat.dark .ch-msg.in .ch-doublecheck::after { background: rgba(255,255,255,0.35); }
+.ch-chat.dark .ch-composer-inner { background: rgba(44,44,46,0.9); border-color: rgba(255,255,255,0.08); }
+.ch-chat.dark .ch-composer-field { color: #e5e5ea; }
+.ch-chat.dark .ch-composer-field::placeholder { color: rgba(255,255,255,0.25); }
+.ch-chat.dark .ch-sheet { background: #1c1c1e; }
+.ch-chat.dark .ch-sheet-body { color: #98989d; }
+.ch-chat.dark .ch-sheet-handle div { background: rgba(255,255,255,0.15); }
+.ch-chat.dark .ch-date-sep { color: rgba(255,255,255,0.3); }
+.ch-chat.dark .ch-thinking-btn { background: rgba(45,140,255,0.1); border-color: rgba(45,140,255,0.2); }
+
+/* --- Mobile responsive --- */
+@media (max-width: 768px) {
+  .ch-nav { height: 50px; padding: 6px 12px; }
+  .ch-nav-avatar { width: 30px; height: 30px; }
+  .ch-nav-name { font-size: 14px; }
+  .ch-bubble { max-width: 78vw; padding: 10px 14px; font-size: 16px; }
+  .ch-composer { padding: 6px 10px 22px; }
+  .ch-avatar { width: 28px; height: 28px; }
+  .ch-bubble-row { gap: 6px; }
+}
+@media (max-width: 480px) {
+  .ch-bubble { max-width: 82vw; font-size: 15px; padding: 10px 13px; }
+  .ch-msg.out + .ch-msg.in, .ch-msg.in + .ch-msg.out { margin-top: 14px; }
+}
+
+/* ============ Settings ============ */
+.settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 100; animation: fadeIn 0.15s; }
+.settings-panel { backdrop-filter: blur(20px); border-radius: 16px; width: 380px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.1); animation: slideUp 0.18s; }
+@keyframes slideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+.settings-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid rgba(128,128,128,0.12); }
+.settings-header h3 { font-size: 15px; font-weight: 600; }
+.settings-header button { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: none; background: transparent; cursor: pointer; border-radius: 4px; }
+.settings-header button:hover { background: rgba(128,128,128,0.08); }
+
+.settings-body { padding: 14px 16px 18px; }
+.setting-group { margin-bottom: 14px; }
+.setting-group label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+.setting-group textarea { width: 100%; padding: 8px 10px; border: 1px solid; border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical; }
+.setting-group textarea:focus { outline: none; }
+
+.avatar-upload-row { display: flex; gap: 16px; }
+.avatar-upload-item { display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; }
+.avatar-upload-item span { font-size: 10px; }
+.avatar-preview { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; border: 1.5px dashed; transition: border-color 0.15s; }
+.avatar-preview:hover { border-style: solid; }
+
+.save-settings-btn { width: 100%; padding: 9px; border: none; border-radius: 10px; color: white; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 4px; }
+.save-settings-btn:hover { filter: brightness(1.06); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 2px; }
+
+/* ============ Moment — Instagram 推荐页 ============ */
+.ig-page { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.ig-header { display: flex; justify-content: space-between; align-items: center; padding: '10px 16px'; height: 54px; flex-shrink: 0; }
+.ig-logo { font-size: 18px; font-weight: 600; letter-spacing: -0.5; }
+.ig-search { margin: 0 16px 10px; flex-shrink: 0; }
+.ig-feed { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+.ig-post { padding: 0 16px; }
+.ig-avatar { width: 32px; height: 32px; border-radius: 50%; background-size: cover; background-position: center; margin-right: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.ig-carousel { border-radius: 4px; overflow: hidden; }
+.ig-tasks-drawer { animation: slideUp 0.2s ease; }
+
+/* ============ Diary — 苹果备忘录 ============ */
+.diary-page { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.diary-header { flex-shrink: 0; padding: 14px 16px 10px; }
+.diary-new { flex-shrink: 0; }
+.diary-list { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+
+/* ============ 移动端适配 ============ */
+@media (max-width: 768px) {
+  /* Chat 已改用 .ch- 前缀，移动端响应在 .ch- CSS 中处理 */
+
+  /* 开屏 dock 紧凑 */
+  .ios-dock { gap: 20px; height: 80px; padding: 0 16px; margin-bottom: 10px; }
+  .ios-dock-icon { width: 40px; height: 40px; }
+  .ios-dock-icon-img { width: 32px; height: 32px; }
+  .ios-dock-label { font-size: 9px; }
+
+  /* 开屏时钟 — 移动端也占 1/3 屏幕 */
+  .ios-clock-wrap { min-height: 33vh !important; height: 33vh !important; }
+  .ios-clock { font-size: min(18vw, 96px) !important; }
+  .ios-clock-date { font-size: 13px !important; }
+
+  /* 照片 widget */
+  .ios-photo-widget-sq { max-height: 140px; }
+  
+  /* 音乐 widget */
+  .ios-music-widget { height: 44px; }
+  .ios-music-cover { width: 32px; height: 32px; }
+  
+  /* 日历 widget */
+  .ios-calendar-widget { padding: 10px 12px; }
+
+  /* App 图标 */
+  .ios-app-grid { gap: 10px 0; }
+  .ios-app-icon { width: 48px; height: 48px; border-radius: 12px; }
+  .ios-app-icon-img { width: 38px; height: 38px; }
+  .ios-app-label { font-size: 9px; }
+
+  /* 控制区 */
+  .ios-home-controls { flex-direction: column; gap: 6px; }
+  .ios-mode-btn { padding: 4px 10px; font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  .ios-clock-wrap { min-height: 33vh !important; height: 33vh !important; }
+  .ios-clock { font-size: min(16vw, 72px) !important; }
+  .ios-clock-date { font-size: 12px !important; }
+  .ios-photo-widget-sq { max-height: 110px; }
+  .ios-dock { gap: 14px; height: 74px; }
+}
+
+/* ============ Bottom Sheet Animations ============ */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }

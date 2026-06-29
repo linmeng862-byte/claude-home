@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.DS_Store
+*.local
+
+# 参考文档 — 不用推到 Zeabur
+1_docx_extracted/
+claude_docx_extracted/
+ios_docx_extracted/
+UI参考/
+OMBRE_BRAIN_API.md
+thinking.docx
+
+# 临时脚本
+_*.bat
+_*.js
+_*.txt
+思路.pdf
