@@ -303,12 +303,12 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
       {homeBg && <div className="ios-home-bg" style={{ backgroundImage: `url(${homeBg})` }} />}
 
       <div className="ios-home-scroll">
-        {/* 实时时钟 — 占1/3高度 + 液态玻璃磨砂质感 */}
-        <div className="ios-clock-wrap" style={{ background: ios.cardBg, border: `0.5px solid ${ios.cardBorder}` }}>
-          <div className="ios-clock" style={{ color: ios.text }}>
+        {/* 实时时钟 — iOS 锁屏风格：纯数字悬浮 */}
+        <div className="ios-clock-wrap">
+          <div className="ios-clock" style={{ color: darkMode ? 'rgba(255,255,255,0.88)' : ios.text, textShadow: darkMode ? '0 0 40px rgba(255,255,255,0.08),0 0 80px rgba(255,255,255,0.04),0 1px 0 rgba(255,255,255,0.15)' : 'none' }}>
             {timeStr || '--:--'}
           </div>
-          <div className="ios-clock-date" style={{ color: ios.textMuted }}>
+          <div className="ios-clock-date" style={{ color: darkMode ? 'rgba(255,255,255,0.5)' : ios.textMuted }}>
             {new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })}
           </div>
         </div>
@@ -1284,6 +1284,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [searchResults, setSearchResults] = useState([])
   const [searchSource, setSearchSource] = useState('kugou') // kugou | itunes | spotify
   const [searching, setSearching] = useState(false)
+  const [audioLoading, setAudioLoading] = useState(false) // 歌曲URL加载中
   // 真实音频播放
   const audioRef = useRef(null)
   const [audioSrc, setAudioSrc] = useState(() => localStorage.getItem('bh_music_audio') || '')
@@ -1404,21 +1405,23 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
 
   const handleMusicSearch = searchSource === 'kugou' ? handleKugouSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
 
-  // 选中歌曲：设封面到唱片中心 + 播放
+  // 选中歌曲：设封面到唱片中心 + 获取URL后自动播放
   const selectSong = async (r) => {
     setSongTitle(r.title); setSongArtist(r.artist); setShowSearch(false); setPlaying(false)
     setEmbedUrl('') // 清除旧 Spotify 嵌入
+    setAudioLoading(true)
     // 设置音频源
-    if (r.audioUrl) { setAudioSrc(r.audioUrl) }
+    let url = ''
+    if (r.audioUrl) { url = r.audioUrl }
     else if (r.source === 'kugou') {
-      // 酷狗：通过后端获取播放URL
       try {
         const ar = await fetch(`/api/kugou/url?hash=${r.id}`)
         const ad = await ar.json()
-        if (ad.url) setAudioSrc(ad.url)
-        else setAudioSrc('')
-      } catch { setAudioSrc('') }
-    } else { setAudioSrc('') }
+        if (ad.url) url = ad.url
+      } catch {}
+    }
+    setAudioSrc(url)
+    setAudioLoading(false)
 
     // 设置封面
     if (r.source === 'kugou') {
@@ -1438,8 +1441,18 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       } catch { setSongCover(r.cover) }
       setEmbedUrl(`https://open.spotify.com/embed/track/${r.id}?utm_source=generator&theme=0`)
     } else {
-      // iTunes 封面替换为大图
       setSongCover(r.cover?.replace('100x100', '600x600') || r.cover)
+    }
+
+    // URL 就绪后自动播放
+    if (url) {
+      // 需要等 React 把 <audio key={url}> 渲染出来，用 setTimeout 让 ref 生效
+      setTimeout(() => {
+        const audio = audioRef.current
+        if (audio) {
+          audio.play().then(() => setPlaying(true)).catch(() => setPlaying(false))
+        }
+      }, 100)
     }
   }
 
@@ -1507,9 +1520,9 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       {/* 控制按钮 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 16 }}>
         <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><SkipBack size={24} /></button>
-        <button onClick={() => { if (!audioSrc && !embedUrl) { setShowSearch(true); return } setPlaying(!playing) }}
-          style={{ width: 56, height: 56, borderRadius: '50%', background: themeColor ? themeColor.replace('rgb','rgba').replace(')',',0.25)') : 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
-          {playing ? <Pause size={22} style={{ color: '#f0eff5' }} /> : <Play size={22} style={{ color: '#f0eff5', marginLeft: 2 }} />}
+        <button onClick={() => { if (audioLoading) return; if (!audioSrc && !embedUrl) { setShowSearch(true); return } setPlaying(!playing) }}
+          style={{ width: 56, height: 56, borderRadius: '50%', background: audioLoading ? 'rgba(255,255,255,0.06)' : (themeColor ? themeColor.replace('rgb','rgba').replace(')',',0.25)') : 'rgba(255,255,255,0.12)'), border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: audioLoading ? 'wait' : 'pointer', backdropFilter: 'blur(10px)' }}>
+          {audioLoading ? <div style={{width:18,height:18,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'#f0eff5',borderRadius:'50%',animation:'discSpin 1s linear infinite'}} /> : playing ? <Pause size={22} style={{ color: '#f0eff5' }} /> : <Play size={22} style={{ color: '#f0eff5', marginLeft: 2 }} />}
         </button>
         <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><SkipForward size={24} /></button>
       </div>
