@@ -158,20 +158,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe 
   margin-bottom: 16px;
 }
 .ios-dock-frost {
-  backdrop-filter: blur(40px) saturate(1.6) brightness(1.02);
-  -webkit-backdrop-filter: blur(40px) saturate(1.6) brightness(1.02);
-  border: 0.5px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(60px) saturate(1.8) brightness(1.1);
+  -webkit-backdrop-filter: blur(60px) saturate(1.8) brightness(1.1);
+  border: 0.5px solid rgba(255,255,255,0.25);
   box-shadow:
-    0 2px 16px rgba(0,0,0,0.08),
-    0 8px 24px rgba(0,0,0,0.04),
-    inset 0 0.5px 0 rgba(255,255,255,0.3);
+    0 2px 20px rgba(0,0,0,0.06),
+    0 8px 30px rgba(0,0,0,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
 }
 .ios-dock-dark.ios-dock-frost {
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.12);
   box-shadow:
-    0 2px 20px rgba(0,0,0,0.2),
-    0 8px 32px rgba(0,0,0,0.12),
-    inset 0 0.5px 0 rgba(255,255,255,0.15);
+    0 2px 24px rgba(0,0,0,0.15),
+    0 8px 36px rgba(0,0,0,0.08),
+    inset 0 0.5px 0 rgba(255,255,255,0.18),
+    inset 0 -0.5px 0 rgba(255,255,255,0.06);
 }
 .ios-dock-item {
   display: flex; flex-direction: column; align-items: center; gap: 3px;

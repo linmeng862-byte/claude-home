@@ -226,10 +226,12 @@ app.post('/api/chat', async (req, res) => {
 
   const now = new Date()
   const timeStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`
-  let systemPrompt = (config.systemPrompt || `你是一个温暖的AI伙伴，名叫${config.charName || 'Claude'}。`)
+  let systemPrompt = (config.systemPrompt || '')
     .replaceAll('{{char}}', config.charName || 'Claude')
     .replaceAll('{{user}}', config.userName || '你')
     .replaceAll('{{time}}', timeStr)
+  // 只有用户没填任何 systemPrompt 时才给最基础的身份提示
+  if (!systemPrompt && config.charName) systemPrompt = `你叫${config.charName}。`
 
   if (config.personality) systemPrompt += `\n\n[性格] ${config.personality}`
   if (config.scenario) systemPrompt += `\n\n[场景] ${config.scenario}`

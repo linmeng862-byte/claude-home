@@ -290,11 +290,11 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
   const ios = darkMode
     ? { bg: '#0a0a0c', cardBg: 'rgba(28,28,30,0.45)', cardBorder: 'rgba(255,255,255,0.08)',
         text: '#f0eff5', textMuted: '#8e8e93', accent: '#0A84FF', separator: 'rgba(255,255,255,0.06)',
-        dockBg: 'rgba(28,28,30,0.45)', widgetOverlay: 'rgba(0,0,0,0.25)',
+        dockBg: 'rgba(28,28,30,0.12)', widgetOverlay: 'rgba(0,0,0,0.25)',
       }
     : { bg: themeColor || '#F8F8FF', cardBg: 'rgba(255,255,255,0.45)', cardBorder: 'rgba(0,0,0,0.06)',
         text: '#1c1c1e', textMuted: '#8e8e93', accent: '#259CFC', separator: 'rgba(0,0,0,0.06)',
-        dockBg: 'rgba(245,245,247,0.45)', widgetOverlay: 'rgba(0,0,0,0.15)',
+        dockBg: 'rgba(245,245,247,0.10)', widgetOverlay: 'rgba(0,0,0,0.15)',
       }
 
   return (
@@ -525,7 +525,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
       await parseSSE(stream,
         (tk)=>{acc+=tk;setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))},
         (th)=>{tacc+=th;setMessages(p=>p.map(m=>m.id===aid?{...m,thinking:tacc}:m))},
-        (tn,ta)=>{const cfg=config||{};fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:''})}).then(r=>r.json()).then(d=>{if(d.type==='moment'&&d.content){window.dispatchEvent(new CustomEvent('ai-moment',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n📸 已发布朋友圈: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
+        (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='moment'&&d.content){window.dispatchEvent(new CustomEvent('ai-moment',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n📸 已发布朋友圈: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
         (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);fetch('/api/memory/dream').catch(()=>{})}
       )
     } catch(e){setMessages(p=>[...p,{id:Date.now()+1,role:'assistant',content:'调用失败: '+e.message,thinking:null,created_at:new Date().toISOString()}]);setIsTyping(false)}
@@ -665,7 +665,9 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
       comments: [],
       tasks: ['整理花园', '给植物浇水', '拍一组照片'] },
   ]
-  const [aiPosts, setAiPosts] = useState([])
+  const [aiPosts, setAiPosts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('bh_moments') || '[]') } catch { return [] }
+  })
   const [allComments, setAllComments] = useState({}) // { postId: [{name, text}] }
   const [commentText, setCommentText] = useState('')
   const [commentingPostId, setCommentingPostId] = useState(null)
@@ -674,7 +676,12 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
   useEffect(() => {
     const handler = (e) => {
       const { content, aiName: name, aiAvatar: avatar } = e.detail
-      setAiPosts(prev => [{ id: Date.now(), avatar, name, remark: '✦ AI', verified: true, content, time: '刚刚', tasks: [] }, ...prev])
+      const newPost = { id: Date.now(), avatar, name, remark: '✦ AI', verified: true, content, time: '刚刚', tasks: [] }
+      setAiPosts(prev => {
+        const next = [newPost, ...prev]
+        localStorage.setItem('bh_moments', JSON.stringify(next))
+        return next
+      })
     }
     window.addEventListener('ai-moment', handler)
     return () => window.removeEventListener('ai-moment', handler)
@@ -1020,13 +1027,15 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
    ============================================================ */
 function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName, config }) {
   const [openSection, setOpenSection] = useState({})
-  const [secretOpen, setSecretOpen] = useState(false)
   // 动态数据：从 localStorage 读取（AI 编辑后保存），不再用硬编码默认
   const [bio, setBio] = useState(() => localStorage.getItem('bh_thinking_bio') || '')
   const [personalityText, setPersonalityText] = useState(() => localStorage.getItem('bh_thinking_personality') || '')
   const [hobbyText, setHobbyText] = useState(() => localStorage.getItem('bh_thinking_hobby') || '')
   const [valuesText, setValuesText] = useState(() => localStorage.getItem('bh_thinking_values') || '')
   const [isGenerating, setIsGenerating] = useState(false)
+  // 漫游手记 — 从 Ombre Brain wander 加载
+  const [wanderData, setWanderData] = useState(() => localStorage.getItem('bh_wander_data') || '')
+  const [wanderLoading, setWanderLoading] = useState(false)
 
   // AI 生成简介（调用 chat API）
   const generateBio = async () => {
@@ -1034,9 +1043,9 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
     if (!cfg.endpoint || !cfg.apiKey) return
     setIsGenerating(true)
     try {
-      const prompt = `请为"${cfg.aiName || 'Claude'}"写一段社交档案简介（bio），基于以下人设信息：
-性格：${cfg.personality || '温柔、好奇'}
-场景：${cfg.scenario || ''}
+      const prompt = `请为"${cfg.aiName || 'Claude'}"写一段社交档案简介（bio）。
+${cfg.personality ? '性格参考：' + cfg.personality : ''}
+${cfg.scenario ? '场景参考：' + cfg.scenario : ''}
 请用第一人称，3-5句话，风格亲切自然。只输出简介文本，不要其他内容。`
 
       const res = await fetch('/api/chat', {
@@ -1090,7 +1099,7 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
     setIsGenerating(true)
     try {
       const prompts = {
-        personality: `基于人设"${cfg.personality || '温柔、好奇'}"，用第一人称写3-4句关于性格的描述。只输出文本。`,
+        personality: `${cfg.personality ? '基于现有性格"' + cfg.personality + '"进行扩展，' : ''}为"${cfg.aiName || 'Claude'}"用第一人称写3-4句关于性格的描述。只输出文本。`,
         hobby: `为"${cfg.aiName || 'Claude'}"写3-4句爱好描述，风格温柔文艺。只输出文本。`,
         values: `为"${cfg.aiName || 'Claude'}"写2-3句人生信条，风格有深度。只输出文本。`
       }
@@ -1157,49 +1166,21 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
       window.removeEventListener('ai-thinking-personality', personalityHandler)
     }
   }, [])
-  // 回忆画廊 — 从 localStorage 读取 AI 上传的图片
-  const [galleryItems, setGalleryItems] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bh_gallery') || '[]') } catch { return [] }
-  })
-  // 时间线 — 从 localStorage 读取动态事件
-  const [timeline, setTimeline] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bh_timeline') || 'null') } catch { return null }
-  })
-  const defaultTimeline = [
-    { date: '2026.06', text: '学会了做桂花拿铁' },
-    { date: '2026.03', text: '开始画水彩日记' },
-    { date: '2025.12', text: '第一次独自旅行' },
-  ]
-  const displayTimeline = timeline || defaultTimeline
-
-  // 监听 AI 上传回忆图片事件
-  useEffect(() => {
-    const handler = (e) => {
-      const { image, label } = e.detail
-      setGalleryItems(prev => {
-        const next = [...prev, { image, label: label || '回忆', id: Date.now() }]
-        localStorage.setItem('bh_gallery', JSON.stringify(next))
-        return next
-      })
-    }
-    window.addEventListener('ai-gallery', handler)
-    return () => window.removeEventListener('ai-gallery', handler)
-  }, [])
-
-  // 监听 AI 添加时间线事件
-  useEffect(() => {
-    const handler = (e) => {
-      const { date, text } = e.detail
-      setTimeline(prev => {
-        const next = [{ date, text }, ...(prev || defaultTimeline)]
-        localStorage.setItem('bh_timeline', JSON.stringify(next))
-        return next
-      })
-    }
-    window.addEventListener('ai-timeline', handler)
-    return () => window.removeEventListener('ai-timeline', handler)
-  }, [])
-
+  // 加载 Ombre Brain 漫游手记
+  const loadWander = async () => {
+    const cookie = localStorage.getItem('bh_ombre_cookie') || ''
+    if (!cookie) return
+    setWanderLoading(true)
+    try {
+      const r = await fetch(`/api/memory/evolution/wander`, { headers: { 'x-ombre-cookie': cookie } })
+      const d = await r.json()
+      const text = typeof d === 'string' ? d : (d.content || d.text || d.wander || JSON.stringify(d, null, 2))
+      if (text) { setWanderData(text); localStorage.setItem('bh_wander_data', text) }
+    } catch {}
+    setWanderLoading(false)
+  }
+  // 页面加载时自动拉取漫游
+  useEffect(() => { const cookie = localStorage.getItem('bh_ombre_cookie'); if (cookie) loadWander() }, [])
   const toggleSection = (id) => setOpenSection(p => ({...p, [id]: !p[id]}))
 
   const sections = [
@@ -1243,23 +1224,6 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
           </button>
         </div>
 
-        {/* 回忆画廊 — AI 上传的图片 + 占位 */}
-        <div style={{ padding: '5px 20px 15px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ color: '#fff', fontSize: 13, fontWeight: 500, marginBottom: 10 }}>💭 回忆画廊</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, perspective: 1000 }}>
-            {galleryItems.length > 0 ? galleryItems.map((item, i) => (
-              <div key={item.id || i} style={{ aspectRatio: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', transition: 'transform 0.4s', position: 'relative' }}>
-                <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', padding: '4px 6px', fontSize: 10, color: '#d8d8d8' }}>{item.label}</div>
-              </div>
-            )) : ['晨光','雨声','星光'].map((label, i) => (
-              <div key={i} style={{ aspectRatio: 1, background: `linear-gradient(135deg, hsl(${240+i*30},50%,${15+i*5}%) 0%, hsl(${260+i*30},50%,${20+i*5}%) 100%)`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#d8d8d8', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', transition: 'transform 0.4s' }}>
-                {label}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* 手风琴段落 — 从 localStorage 读取 + AI 编辑 */}
         <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sections.map(s => (
@@ -1279,32 +1243,28 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
               )}
             </div>
           ))}
-
-          {/* 秘密人格切换 */}
-          <div style={{ position: 'relative', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid transparent', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 15px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.6, minHeight: 60, paddingBottom: 36 }}>
-              {!secretOpen ? '表面上看，我只是一只安静的兔子...' : ''}
-              {secretOpen && <div style={{ position: 'absolute', inset: 0, background: '#111115', color: '#f472b6', fontSize: 12, lineHeight: 1.6, padding: '14px 15px', zIndex: 5, borderRadius: 4 }}>其实偶尔也想疯狂一下，比如凌晨三点骑车去海边看日出 🌅</div>}
-            </div>
-            <div onClick={() => setSecretOpen(!secretOpen)} style={{ position: 'absolute', bottom: 4, right: 8, padding: '3px 10px', background: secretOpen ? 'rgba(244,114,182,0.2)' : 'rgba(255,255,255,0.1)', borderRadius: 12, color: secretOpen ? '#f472b6' : '#fff', fontSize: 10, fontWeight: 600, cursor: 'pointer' }}>
-              {secretOpen ? '收起' : '秘密'}
-            </div>
-          </div>
         </div>
 
-        {/* 时间线 — 动态，AI 可添加 */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ color: '#fff', fontSize: 13, fontWeight: 500, marginBottom: 12 }}>🌱 成长足迹</div>
-          <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', marginLeft: 6, paddingLeft: 16 }}>
-            {displayTimeline.map((t, i) => (
-              <div key={i} style={{ position: 'relative', marginBottom: 14 }}>
-                <div style={{ position: 'absolute', left: -21, top: 3, width: 9, height: 9, borderRadius: '50%', background: '#a78bfa', border: '2px solid #111115', boxShadow: '0 0 5px rgba(167,139,250,0.5)' }} />
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>{t.date}</div>
-                <div style={{ fontSize: 12, color: '#a1a1aa' }}>{t.text}</div>
-              </div>
-            ))}
+        {/* 🗺️ 漫游手记 — Ombre Brain wander */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ color: '#fff', fontSize: 13, fontWeight: 500 }}>🗺️ 漫游手记</div>
+            <button onClick={loadWander} disabled={wanderLoading}
+              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 6, padding: '3px 10px', fontSize: 10, cursor: wanderLoading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              ↻ {wanderLoading ? '加载中...' : '刷新'}
+            </button>
           </div>
+          {wanderData ? (
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '14px 15px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', border: '1px solid rgba(255,255,255,0.04)' }}>
+              {wanderData}
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '20px 15px', color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
+              {!localStorage.getItem('bh_ombre_cookie') ? '💡 先在记忆页面登录 Ombre Brain，漫游手记就会出现在这里' : '暂无漫游记录，AI 消化记忆后会自动生成...'}
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   )
@@ -2120,7 +2080,11 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
     try {
       const r = await fetch(`${API}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pwd }) })
       const d = await r.json()
-      if (d.ok) { setCookie(d.cookie); setLogged(true); loadBuckets(d.cookie); loadEvolution('persona', d.cookie) }
+      if (d.ok) {
+        setCookie(d.cookie); setLogged(true); loadBuckets(d.cookie); loadEvolution('persona', d.cookie)
+        // 保存 cookie 到 localStorage 供 ThinkingPage 使用
+        localStorage.setItem('bh_ombre_cookie', d.cookie)
+      }
       else setBreath(prev => prev + '\n⚠️ 登录失败')
     } catch (e) { setBreath(prev => prev + `\n⚠️ ${e.message}`) }
     setLoading(false)
