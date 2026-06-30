@@ -223,7 +223,7 @@ app.post('/api/chat', async (req, res) => {
 
   systemPrompt += `\n\n[你可以使用的工具]
 - get_current_time: 获取当前时间（用户问时间时使用）
-- post_moment: 发朋友圈（当你觉得有值得分享的想法、日常、心情时，主动使用，content 是你写的文字）
+- post_echo: 发布回响（当你觉得有值得分享的想法、日常、心情时，主动使用，content 是你写的文字）
 - write_diary: 写日记（当你想要记录什么、或者帮用户记录时使用，title 和 content 都由你创作）
 - save_memory: 保存重要内容到记忆库（重要的事、用户的偏好、关键约定等）
 
@@ -251,7 +251,7 @@ app.post('/api/chat', async (req, res) => {
         reqBody.tools = [
           { name: 'get_current_time', description: '获取当前时间', input_schema: { type: 'object', properties: {} } },
           { name: 'save_memory', description: '保存重要内容到记忆库', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
-          { name: 'post_moment', description: '发朋友圈', input_schema: { type: 'object', properties: { content: { type: 'string', description: '朋友圈内容' } }, required: ['content'] } },
+          { name: 'post_echo', description: '发布回响', input_schema: { type: 'object', properties: { content: { type: 'string', description: '回响内容' } }, required: ['content'] } },
           { name: 'write_diary', description: '写日记', input_schema: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } },
         ]
       }
@@ -337,23 +337,35 @@ app.post('/api/read-comment', async (req, res) => {
 app.post('/api/tools/call', async (req, res) => {
   const { tool, args, cookie } = req.body
   try {
+    // 写入 Brain 的辅助函数 — 让所有 tool 产出都进入 Brain
+    const writeToBrain = async (content, tags = '') => {
+      if (!cookie) return null
+      try {
+        const r = await fetch(`${OMBRE_BRAIN}/api/buckets`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({ content, tags, importance: 6 }),
+        })
+        return await r.json()
+      } catch { return null }
+    }
+
     switch (tool) {
       case 'get_current_time': {
         const now = new Date()
         return res.json({ result: `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}` })
       }
       case 'save_memory': {
-        const r = await fetch(`${OMBRE_BRAIN}/api/buckets`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie || '' },
-          body: JSON.stringify({ content: args.content, tags: args.tags || '', importance: args.importance || 5 }),
-        })
-        const data = await r.json()
+        const data = await writeToBrain(args.content, args.tags || '')
         return res.json({ result: '记忆已保存', data })
       }
-      case 'post_moment': {
-        return res.json({ result: 'ok', content: args.content, type: 'moment' })
+      case 'post_echo': {
+        // Echo 写入 Brain — Brain 可以在 dream/reflection 中消化这段回响
+        await writeToBrain(`[Echo] ${args.content}`, 'echo,回响')
+        return res.json({ result: 'ok', content: args.content, type: 'echo' })
       }
       case 'write_diary': {
+        // Diary 写入 Brain — 让 Brain 知道发生了什么
+        await writeToBrain(`[Diary] ${args.title}: ${args.content}`, 'diary,日记')
         return res.json({ result: 'ok', title: args.title, content: args.content, type: 'diary' })
       }
       default:
@@ -371,7 +383,7 @@ app.get('*', (_req, res) => {
 
 // ============ 启动 ============
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🏠 Claude Home → http://localhost:${PORT}`)
+  console.log(`🏠 Eidos → http://localhost:${PORT}`)
   console.log(`   Ombre Brain → ${OMBRE_BRAIN}`)
   console.log(`   Static files → ${clientDist}`)
 }).on('error', (e) => {

@@ -451,7 +451,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe 
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.15); border-radius: 2px; }
 
-/* ============ Moment — Instagram 推荐页 ============ */
+/* ============ Echo — 共同生活的痕迹 ============ */
 .ig-page { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
 .ig-header { display: flex; justify-content: space-between; align-items: center; padding: '10px 16px'; height: 54px; flex-shrink: 0; }
 .ig-logo { font-size: 18px; font-weight: 600; letter-spacing: -0.5; }

@@ -37,7 +37,7 @@ const MODULES = [
   { id: 'music',   name: 'Music',   icon: Music,         roman: 'IV',  sub: '音乐', iconSrc: null },
   { id: 'memory',  name: 'Memory',  icon: Database,      roman: 'V',   sub: '记忆', iconSrc: '/icons/12.png' },
   { id: 'thinking',name: 'Thinking',icon: Brain,         roman: 'VI',  sub: '思考', iconSrc: '/icons/11.png' },
-  { id: 'moment',  name: 'Moment',  icon: Heart,         roman: 'VII', sub: '瞬间', iconSrc: null },
+  { id: 'echo',    name: 'Echo',    icon: Heart,         roman: 'VII', sub: '回响', iconSrc: null },
 ]
 
 const APP_ICONS = [ // 上方4个 app 图标
@@ -49,7 +49,7 @@ const APP_ICONS = [ // 上方4个 app 图标
 
 const DOCK_APPS = [ // 下方 dock
   { id: 'chat',    name: 'Chat',    iconSrc: '/icons/13.png' },
-  { id: 'moment',  name: 'Moment',  iconSrc: '/icons/14.png' },
+  { id: 'echo',    name: 'Echo',    iconSrc: '/icons/14.png' },
   { id: 'settings', name: 'Setting', iconSrc: '/icons/setting.png' },
 ]
 
@@ -445,7 +445,7 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
         <input ref={bgRef} type="file" accept="image/*" hidden onChange={handleHomeBg} />
       </div>
 
-      {/* 底部 Dock — 磨砂玻璃半透明 + Chat + Moment 上下居中 */}
+      {/* 底部 Dock — 磨砂玻璃半透明 + Chat + Echo 上下居中 */}
       <div className={`ios-dock ios-dock-frost ${darkMode ? 'ios-dock-dark' : ''}`} style={{ background: ios.dockBg }}>
         {DOCK_APPS.map(app => (
           <div key={app.id} className="ios-dock-item" onClick={() => onModuleSelect(app.id)}>
@@ -525,8 +525,8 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
       await parseSSE(stream,
         (tk)=>{acc+=tk;setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))},
         (th)=>{tacc+=th;setMessages(p=>p.map(m=>m.id===aid?{...m,thinking:tacc}:m))},
-        (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='moment'&&d.content){window.dispatchEvent(new CustomEvent('ai-moment',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n📸 已发布朋友圈: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
-        (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);fetch('/api/memory/dream').catch(()=>{})}
+        (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='echo'&&d.content){window.dispatchEvent(new CustomEvent('ai-echo',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n🌊 已发布回响: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
+        (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);fetch('/api/memory/dream').catch(()=>{});const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';if(ombreCookie&&fc){const userMsg=messages[messages.length-1]?.content||'';fetch('/api/memory/buckets',{method:'POST',headers:{'Content-Type':'application/json','x-ombre-cookie':ombreCookie},body:JSON.stringify({content:`[Chat] 用户: ${userMsg.slice(0,200)} | AI: ${fc.slice(0,200)}`,tags:'chat,对话',importance:4})}).catch(()=>{})}}
       )
     } catch(e){setMessages(p=>[...p,{id:Date.now()+1,role:'assistant',content:'调用失败: '+e.message,thinking:null,created_at:new Date().toISOString()}]);setIsTyping(false)}
   }
@@ -650,7 +650,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
     </div>
   )
 }
-function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) {
+function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) {
   const ios = darkMode
     ? { bg: '#0a0a0c', cardBg: 'rgba(28,28,30,0.85)', cardBorder: 'rgba(255,255,255,0.08)',
         text: '#f0eff5', textMuted: '#8e8e93', accent: '#5464F5', separator: 'rgba(255,255,255,0.06)',
@@ -666,7 +666,7 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
       tasks: ['整理花园', '给植物浇水', '拍一组照片'] },
   ]
   const [aiPosts, setAiPosts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bh_moments') || '[]') } catch { return [] }
+    try { return JSON.parse(localStorage.getItem('bh_echoes') || '[]') } catch { return [] }
   })
   const [allComments, setAllComments] = useState({}) // { postId: [{name, text}] }
   const [commentText, setCommentText] = useState('')
@@ -679,12 +679,12 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
       const newPost = { id: Date.now(), avatar, name, remark: '✦ AI', verified: true, content, time: '刚刚', tasks: [] }
       setAiPosts(prev => {
         const next = [newPost, ...prev]
-        localStorage.setItem('bh_moments', JSON.stringify(next))
+        localStorage.setItem('bh_echoes', JSON.stringify(next))
         return next
       })
     }
-    window.addEventListener('ai-moment', handler)
-    return () => window.removeEventListener('ai-moment', handler)
+    window.addEventListener('ai-echo', handler)
+    return () => window.removeEventListener('ai-echo', handler)
   }, [])
   const allPosts = [...aiPosts, ...posts]
   const [likedPosts, setLikedPosts] = useState({})
@@ -692,12 +692,20 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
   const [tasksPostId, setTasksPostId] = useState(null)
   const activeTasksPost = allPosts.find(p => p.id === tasksPostId)
 
-  const submitComment = (postId) => {
+  const submitComment = (postId, postContent) => {
     if (!commentText.trim()) return
     setAllComments(prev => ({
       ...prev,
       [postId]: [...(prev[postId] || []), { name: userName || '你', text: commentText.trim() }]
     }))
+    // 互动写入 Brain — 让 Brain 记住这段关系痕迹
+    const cookie = localStorage.getItem('bh_ombre_cookie') || ''
+    if (cookie) {
+      fetch('/api/memory/buckets', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie },
+        body: JSON.stringify({ content: `[Echo 评论] 对"${postContent?.slice(0, 50)}"回应: ${commentText.trim()}`, tags: 'echo,回响,评论', importance: 4 })
+      }).catch(() => {})
+    }
     setCommentText('')
     setCommentingPostId(null)
   }
@@ -706,7 +714,7 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
     <div style={{ position: 'fixed', inset: 0, background: ios.bg, color: ios.text, fontFamily: '-apple-system, sans-serif', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `0.5px solid ${ios.separator}`, flexShrink: 0, background: ios.cardBg }}>
-        <div style={{ fontWeight: 600, fontSize: 16 }}>✦ Claude Home</div>
+        <div style={{ fontWeight: 600, fontSize: 16 }}>✦ Eidos</div>
         <div style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
           <Heart size={22} style={{ color: ios.likeRed }} />
           <Send size={20} style={{ color: ios.text }} />
@@ -765,10 +773,10 @@ function MomentPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }
             {commentingPostId === post.id ? (
               <div style={{ display: 'flex', gap: 8, padding: '0 0 8px', alignItems: 'center' }}>
                 <input value={commentText} onChange={e => setCommentText(e.target.value)}
-                  onKeyDown={e => { if(e.key==='Enter') submitComment(post.id) }}
+                  onKeyDown={e => { if(e.key==='Enter') submitComment(post.id, post.content) }}
                   placeholder="写评论..." autoFocus
                   style={{ flex: 1, background: ios.searchBg, color: ios.text, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
-                <button onClick={() => submitComment(post.id)} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>发送</button>
+                <button onClick={() => submitComment(post.id, post.content)} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>发送</button>
                 <button onClick={() => { setCommentingPostId(null); setCommentText('') }} style={{ background: 'none', border: 'none', color: ios.textMuted, fontSize: 12, cursor: 'pointer' }}>取消</button>
               </div>
             ) : null}
@@ -1026,167 +1034,43 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
    Thinking — Obsidian 社交档案卡 (参考 thinking.docx)
    ============================================================ */
 function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName, config }) {
-  const [openSection, setOpenSection] = useState({})
-  // 动态数据：从 localStorage 读取（AI 编辑后保存），不再用硬编码默认
-  const [bio, setBio] = useState(() => localStorage.getItem('bh_thinking_bio') || '')
-  const [personalityText, setPersonalityText] = useState(() => localStorage.getItem('bh_thinking_personality') || '')
-  const [hobbyText, setHobbyText] = useState(() => localStorage.getItem('bh_thinking_hobby') || '')
-  const [valuesText, setValuesText] = useState(() => localStorage.getItem('bh_thinking_values') || '')
-  const [isGenerating, setIsGenerating] = useState(false)
-  // 漫游手记 — 从 Ombre Brain wander 加载
+  // Thinking 只来自 Ombre Brain — 不独立生成内容
   const [wanderData, setWanderData] = useState(() => localStorage.getItem('bh_wander_data') || '')
+  const [reflectionData, setReflectionData] = useState(() => localStorage.getItem('bh_reflection_data') || '')
+  const [dreamData, setDreamData] = useState(() => localStorage.getItem('bh_dream_data') || '')
   const [wanderLoading, setWanderLoading] = useState(false)
+  const [reflectionLoading, setReflectionLoading] = useState(false)
+  const [dreamLoading, setDreamLoading] = useState(false)
+  const [openSection, setOpenSection] = useState({ wander: true, reflection: false, dream: false })
+  const hasCookie = !!localStorage.getItem('bh_ombre_cookie')
 
-  // AI 生成简介（调用 chat API）
-  const generateBio = async () => {
-    const cfg = config || {}
-    if (!cfg.endpoint || !cfg.apiKey) return
-    setIsGenerating(true)
-    try {
-      const prompt = `请为"${cfg.aiName || 'Claude'}"写一段社交档案简介（bio）。
-${cfg.personality ? '性格参考：' + cfg.personality : ''}
-${cfg.scenario ? '场景参考：' + cfg.scenario : ''}
-请用第一人称，3-5句话，风格亲切自然。只输出简介文本，不要其他内容。`
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: prompt }],
-          config: {
-            format: cfg.apiFormat || 'openai',
-            endpoint: cfg.endpoint,
-            model: cfg.apiModel || '',
-            apiKey: cfg.apiKey,
-            charName: cfg.aiName || 'Claude',
-            userName: cfg.userName || '你',
-            systemPrompt: '你是一个创意写手，只输出纯文本简介。',
-            enableThinking: false
-          }
-        })
-      })
-      if (!res.ok) { setIsGenerating(false); return }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let content = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          const t = line.trim()
-          if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue
-          try {
-            const j = JSON.parse(t.slice(6))
-            if (j.choices?.[0]?.delta?.content) content += j.choices[0].delta.content
-            if (j.delta?.type === 'text_delta' && j.delta.text) content += j.delta.text
-          } catch {}
-        }
-      }
-      if (content.trim()) {
-        setBio(content.trim())
-        localStorage.setItem('bh_thinking_bio', content.trim())
-      }
-    } catch {}
-    setIsGenerating(false)
-  }
-
-  // AI 编辑性格/爱好/信条
-  const generateSection = async (section) => {
-    const cfg = config || {}
-    if (!cfg.endpoint || !cfg.apiKey) return
-    setIsGenerating(true)
-    try {
-      const prompts = {
-        personality: `${cfg.personality ? '基于现有性格"' + cfg.personality + '"进行扩展，' : ''}为"${cfg.aiName || 'Claude'}"用第一人称写3-4句关于性格的描述。只输出文本。`,
-        hobby: `为"${cfg.aiName || 'Claude'}"写3-4句爱好描述，风格温柔文艺。只输出文本。`,
-        values: `为"${cfg.aiName || 'Claude'}"写2-3句人生信条，风格有深度。只输出文本。`
-      }
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: prompts[section] }],
-          config: {
-            format: cfg.apiFormat || 'openai',
-            endpoint: cfg.endpoint,
-            model: cfg.apiModel || '',
-            apiKey: cfg.apiKey,
-            charName: cfg.aiName || 'Claude',
-            userName: cfg.userName || '你',
-            systemPrompt: '你是一个创意写手，只输出纯文本。',
-            enableThinking: false
-          }
-        })
-      })
-      if (!res.ok) { setIsGenerating(false); return }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let content = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
-        for (const line of lines) {
-          const t = line.trim()
-          if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue
-          try {
-            const j = JSON.parse(t.slice(6))
-            if (j.choices?.[0]?.delta?.content) content += j.choices[0].delta.content
-            if (j.delta?.type === 'text_delta' && j.delta.text) content += j.delta.text
-          } catch {}
-        }
-      }
-      if (content.trim()) {
-        const setter = { personality: setPersonalityText, hobby: setHobbyText, values: setValuesText }[section]
-        const storageKey = `bh_thinking_${section}`
-        setter(content.trim())
-        localStorage.setItem(storageKey, content.trim())
-      }
-    } catch {}
-    setIsGenerating(false)
-  }
-
-  // 监听 AI 事件，更新内容
-  useEffect(() => {
-    const bioHandler = (e) => {
-      const text = e.detail?.content || e.detail?.bio || ''
-      if (text) { setBio(text); localStorage.setItem('bh_thinking_bio', text) }
-    }
-    const personalityHandler = (e) => {
-      const text = e.detail?.content || e.detail?.personality || ''
-      if (text) { setPersonalityText(text); localStorage.setItem('bh_thinking_personality', text) }
-    }
-    window.addEventListener('ai-thinking-bio', bioHandler)
-    window.addEventListener('ai-thinking-personality', personalityHandler)
-    return () => {
-      window.removeEventListener('ai-thinking-bio', bioHandler)
-      window.removeEventListener('ai-thinking-personality', personalityHandler)
-    }
-  }, [])
-  // 加载 Ombre Brain 漫游手记
-  const loadWander = async () => {
+  // 加载 Ombre Brain 各 evolution 区块
+  const loadSection = async (section, setter, setLoading) => {
     const cookie = localStorage.getItem('bh_ombre_cookie') || ''
     if (!cookie) return
-    setWanderLoading(true)
+    setLoading(true)
     try {
-      const r = await fetch(`/api/memory/evolution/wander`, { headers: { 'x-ombre-cookie': cookie } })
+      const r = await fetch(`/api/memory/evolution/${section}`, { headers: { 'x-ombre-cookie': cookie } })
       const d = await r.json()
-      const text = typeof d === 'string' ? d : (d.content || d.text || d.wander || JSON.stringify(d, null, 2))
-      if (text) { setWanderData(text); localStorage.setItem('bh_wander_data', text) }
+      const text = typeof d === 'string' ? d : (d.content || d.text || d[section] || JSON.stringify(d, null, 2))
+      if (text) { setter(text); localStorage.setItem(`bh_${section}_data`, text) }
     } catch {}
-    setWanderLoading(false)
+    setLoading(false)
   }
-  // 页面加载时自动拉取漫游
-  useEffect(() => { const cookie = localStorage.getItem('bh_ombre_cookie'); if (cookie) loadWander() }, [])
+
+  const loadWander = () => loadSection('wander', setWanderData, setWanderLoading)
+  const loadReflection = () => loadSection('reflection', setReflectionData, setReflectionLoading)
+  const loadDream = () => loadSection('dream', setDreamData, setDreamLoading)
+
+  // 页面加载时自动拉取全部区块
+  useEffect(() => { if (hasCookie) { loadWander(); loadReflection(); loadDream() } }, [])
+
   const toggleSection = (id) => setOpenSection(p => ({...p, [id]: !p[id]}))
 
-  const sections = [
-    { id: 'personality', title: '性格', content: personalityText },
-    { id: 'hobby', title: '爱好', content: hobbyText },
-    { id: 'values', title: '信条', content: valuesText },
+  const brainSections = [
+    { id: 'wander', title: '🗺️ 漫游手记', subtitle: 'Memory Association — 记忆间的自由联想', data: wanderData, loading: wanderLoading, onRefresh: loadWander },
+    { id: 'reflection', title: '🪞 反省记录', subtitle: 'Reflection — Brain 对自身理解的审视', data: reflectionData, loading: reflectionLoading, onRefresh: loadReflection },
+    { id: 'dream', title: '💭 梦境碎片', subtitle: 'Dream — 记忆消化后的深层重组', data: dreamData, loading: dreamLoading, onRefresh: loadDream },
   ]
 
   return (
@@ -1195,84 +1079,68 @@ ${cfg.scenario ? '场景参考：' + cfg.scenario : ''}
       <button onClick={onBack} style={{ position: 'absolute', top: 14, left: 14, background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, fontSize: 12 }}>←</button>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 40px', width: '100%' }}>
-        {/* 封面 */}
-        <div style={{ position: 'relative', height: 140, background: 'linear-gradient(135deg, #1a1a2e 0%, #0a0a0c 50%, #1a1a3e 100%)' }}>
+        {/* 封面 — 深空 */}
+        <div style={{ position: 'relative', height: 120, background: 'linear-gradient(135deg, #1a1a2e 0%, #0a0a0c 50%, #1a1a3e 100%)' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, #0a0a0c 0%, transparent 100%)' }} />
+          <div style={{ position: 'absolute', bottom: 16, left: 20, fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: 2 }}>THINKING — ONLY FROM BRAIN</div>
         </div>
 
-        {/* 头像 + 状态 */}
-        <div style={{ position: 'relative', padding: '0 20px' }}>
-          <div style={{ position: 'absolute', top: -38, left: 20, width: 76, height: 76, borderRadius: '50%', border: '4px solid #0a0a0c', overflow: 'hidden', background: aiAvatar ? `url(${aiAvatar}) center/cover` : '#1a1a1f', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.5)' }}>
-            {!aiAvatar && <Bot size={28} style={{ color: '#a78bfa' }} />}
+        {/* 页面标题 */}
+        <div style={{ padding: '0 20px', marginTop: -8 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>Thinking</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4, lineHeight: 1.5 }}>
+            这里不生产内容。当 Brain 在 Dream、Reflection 或 Memory Association 中形成新的理解时，Thinking 才产生。
           </div>
-          <div style={{ position: 'absolute', top: -2, left: 82, width: 14, height: 14, background: '#10b981', borderRadius: '50%', border: '2px solid #0a0a0c', boxShadow: '0 0 8px rgba(16,185,129,0.4)' }} />
         </div>
 
-        {/* 信息 — bio 从 localStorage 读取，支持 AI 生成 */}
-        <div style={{ padding: '48px 20px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 18, fontWeight: 700 }}>{aiName || 'Claude'}</span>
-            <span style={{ fontSize: 12, color: '#3b82f6' }}>✓</span>
+        {/* 未连接 Brain 的提示 */}
+        {!hasCookie && (
+          <div style={{ margin: '24px 20px', background: 'rgba(255,200,50,0.08)', borderRadius: 12, padding: '16px 18px', border: '1px solid rgba(255,200,50,0.15)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#ffc832' }}>⚠️ 未连接 Ombre Brain</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 6, lineHeight: 1.5 }}>
+              Thinking 完全依赖 Ombre Brain 的输出。请先在 Memory 页面登录 Brain，理解才会在这里出现。
+            </div>
           </div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>@{aiName ? aiName.toLowerCase().replace(/\s+/g, '_') : 'claude'}_home</div>
-          <div style={{ color: '#d8d8d8', fontSize: 13, lineHeight: 1.5, marginTop: 12 }}>
-            {bio || <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>点击下方按钮让 AI 生成简介...</span>}
-          </div>
-          <button onClick={generateBio} disabled={isGenerating}
-            style={{ marginTop: 8, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa', borderRadius: 8, padding: '5px 12px', fontSize: 11, cursor: isGenerating ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Sparkles size={12} /> {isGenerating ? '生成中...' : 'AI 生成简介'}
-          </button>
-        </div>
+        )}
 
-        {/* 手风琴段落 — 从 localStorage 读取 + AI 编辑 */}
-        <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {sections.map(s => (
-            <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: openSection[s.id] ? '1px solid rgba(167,139,250,0.3)' : '1px solid transparent', overflow: 'hidden', transition: 'all 0.3s' }}>
-              <div onClick={() => toggleSection(s.id)} style={{ padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', color: '#fff', fontSize: 13, fontWeight: 500 }}>
-                {s.title}
-                <span style={{ color: openSection[s.id] ? '#a78bfa' : 'rgba(255,255,255,0.3)', transition: 'transform 0.3s', transform: openSection[s.id] ? 'rotate(45deg)' : 'none', fontSize: 16, fontWeight: 300 }}>+</span>
+        {/* Brain 区块 — 漫游 / 反省 / 梦境 */}
+        <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {brainSections.map(s => (
+            <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: openSection[s.id] ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', transition: 'all 0.3s' }}>
+              <div onClick={() => toggleSection(s.id)} style={{ padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+                <div>
+                  <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{s.title}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 }}>{s.subtitle}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {hasCookie && <button onClick={e => { e.stopPropagation(); s.onRefresh() }} disabled={s.loading}
+                    style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: s.loading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    ↻ {s.loading ? '...' : '刷新'}
+                  </button>}
+                  <span style={{ color: openSection[s.id] ? '#a78bfa' : 'rgba(255,255,255,0.3)', transition: 'transform 0.3s', transform: openSection[s.id] ? 'rotate(45deg)' : 'none', fontSize: 16, fontWeight: 300 }}>+</span>
+                </div>
               </div>
               {openSection[s.id] && (
-                <div style={{ padding: '0 15px 14px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.6 }}>
-                  {s.content || <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>点击 AI 编辑生成...</span>}
-                  <button onClick={() => generateSection(s.id)} disabled={isGenerating}
-                    style={{ marginTop: 6, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: isGenerating ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                    <Sparkles size={10} /> {isGenerating ? '生成中...' : 'AI 编辑'}
-                  </button>
+                <div style={{ padding: '0 15px 14px' }}>
+                  {s.data ? (
+                    <div style={{ color: '#c4c4cc', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                      {s.data}
+                    </div>
+                  ) : (
+                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: 16, fontStyle: 'italic' }}>
+                      {hasCookie ? '暂无内容，Brain 正在消化记忆...' : '请先连接 Ombre Brain'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
-
-        {/* 🗺️ 漫游手记 — Ombre Brain wander */}
-        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div style={{ color: '#fff', fontSize: 13, fontWeight: 500 }}>🗺️ 漫游手记</div>
-            <button onClick={loadWander} disabled={wanderLoading}
-              style={{ background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 6, padding: '3px 10px', fontSize: 10, cursor: wanderLoading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              ↻ {wanderLoading ? '加载中...' : '刷新'}
-            </button>
-          </div>
-          {wanderData ? (
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '14px 15px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', border: '1px solid rgba(255,255,255,0.04)' }}>
-              {wanderData}
-            </div>
-          ) : (
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '20px 15px', color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', border: '1px solid rgba(255,255,255,0.04)' }}>
-              {!localStorage.getItem('bh_ombre_cookie') ? '💡 先在记忆页面登录 Ombre Brain，漫游手记就会出现在这里' : '暂无漫游记录，AI 消化记忆后会自动生成...'}
-            </div>
-          )}
-        </div>
-
       </div>
     </div>
   )
 }
 
-/* ============================================================
-   Music — 圆环唱片 + 自渲染背景 (参考 music.png)
-   ============================================================ */
 function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [playing, setPlaying] = useState(false)
   const [songTitle, setSongTitle] = useState(() => localStorage.getItem('bh_music_title') || '月光曲')
@@ -1459,6 +1327,17 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   useEffect(() => {
     if (songCover) extractThemeColor(songCover)
   }, [songCover])
+
+  // 歌曲信息写入 Brain — 让 Brain 知道我们在听什么
+  useEffect(() => {
+    if (!songTitle || !songArtist) return
+    const cookie = localStorage.getItem('bh_ombre_cookie') || ''
+    if (!cookie) return
+    fetch('/api/memory/buckets', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie },
+      body: JSON.stringify({ content: `[Music] 正在听: ${songTitle} — ${songArtist}`, tags: 'music,音乐', importance: 3 })
+    }).catch(() => {})
+  }, [songTitle, songArtist])
 
   return (
     <main style={{ position: 'fixed', inset: 0, background: themeColor
@@ -2038,7 +1917,7 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
 
         {/* —— 关于 —— */}
         <Section title="关于">
-          <div style={{ fontSize: 13, color: ios.text, lineHeight: 1.6 }}>Claude Home — 一只温暖的兔子 AI 伙伴 🐰</div>
+          <div style={{ fontSize: 13, color: ios.text, lineHeight: 1.6 }}>Eidos — Relationship Operating System</div>
           <div style={{ fontSize: 11, color: ios.textMuted, marginTop: 4 }}>Version 0.1 · Built with ❤️</div>
         </Section>
 
@@ -2335,8 +2214,8 @@ function App() {
       {currentPage === 'music' && (
         <MusicPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} userAvatar={userAvatar} aiAvatar={aiAvatar} aiName={config?.aiName} />
       )}
-      {currentPage === 'moment' && (
-        <MomentPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} userAvatar={userAvatar} aiAvatar={aiAvatar} aiName={config?.aiName} userName={config?.userName} />
+      {currentPage === 'echo' && (
+        <EchoPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} userAvatar={userAvatar} aiAvatar={aiAvatar} aiName={config?.aiName} userName={config?.userName} />
       )}
       {currentPage === 'diary' && (
         <DiaryPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} aiName={config?.aiName} config={config} userAvatar={userAvatar} aiAvatar={aiAvatar} userName={config?.userName} />
