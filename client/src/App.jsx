@@ -1320,7 +1320,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_music_cover') || null)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQ, setSearchQ] = useState('')
-  const [embedUrl, setEmbedUrl] = useState(() => localStorage.getItem('bh_music_embed') || '')
+  const [embedUrl, setEmbedUrl] = useState('') // 不持久化 — 避免每次进入都弹 Spotify 浮窗
   const [searchResults, setSearchResults] = useState([])
   const [searchSource, setSearchSource] = useState('kugou') // kugou | itunes | spotify
   const [searching, setSearching] = useState(false)
@@ -1333,45 +1333,25 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 专辑主题色
   const [themeColor, setThemeColor] = useState(() => localStorage.getItem('bh_music_themecolor') || '')
 
-  // 从专辑封面提取主色
-  const extractThemeColor = (imgUrl) => {
-    if (!imgUrl) return
-    try {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const size = 10 // 小尺寸足够取色
-        canvas.width = size; canvas.height = size
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, size, size)
-        const data = ctx.getImageData(0, 0, size, size).data
-        // 取四角 + 中心区域平均色
-        let r=0,g=0,b=0,count=0
-        for (let i = 0; i < data.length; i += 4) {
-          r += data[i]; g += data[i+1]; b += data[i+2]; count++
-        }
-        r = Math.round(r/count); g = Math.round(g/count); b = Math.round(b/count)
-        const color = `rgb(${r},${g},${b})`
-        setThemeColor(color)
-        localStorage.setItem('bh_music_themecolor', color)
-      }
-      img.onerror = () => {}
-      img.src = imgUrl
-    } catch {}
-  }
-
-  // 持久化当前歌曲信息
+  // 持久化当前歌曲信息（不含 embedUrl，避免每次进 music 页弹 Spotify 浮窗）
   useEffect(() => {
     localStorage.setItem('bh_music_title', songTitle)
     localStorage.setItem('bh_music_artist', songArtist)
     if (songCover) localStorage.setItem('bh_music_cover', songCover)
     else localStorage.removeItem('bh_music_cover')
-    if (embedUrl) localStorage.setItem('bh_music_embed', embedUrl)
-    else localStorage.removeItem('bh_music_embed')
     if (audioSrc) localStorage.setItem('bh_music_audio', audioSrc)
     else localStorage.removeItem('bh_music_audio')
-  }, [songTitle, songArtist, songCover, embedUrl, audioSrc])
+  }, [songTitle, songArtist, songCover, audioSrc])
+
+  // 通过后端提取专辑主色（绕过前端 CORS 限制）
+  const extractThemeColor = async (imgUrl) => {
+    if (!imgUrl) return
+    try {
+      const r = await fetch(`/api/music/color?url=${encodeURIComponent(imgUrl)}`)
+      const d = await r.json()
+      if (d.color) { setThemeColor(d.color); localStorage.setItem('bh_music_themecolor', d.color) }
+    } catch {}
+  }
 
   // 音频进度监听 — 每次渲染都绑定确保 ref 有效
   useEffect(() => {
@@ -1467,6 +1447,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 选中歌曲：设封面到唱片中心 + 播放
   const selectSong = async (r) => {
     setSongTitle(r.title); setSongArtist(r.artist); setShowSearch(false); setPlaying(false)
+    setEmbedUrl('') // 清除旧 Spotify 嵌入
     // 设置音频源
     if (r.audioUrl) { setAudioSrc(r.audioUrl) }
     else if (r.source === 'kugou') {
@@ -1542,7 +1523,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         </div>
         {/* 中心圆 — 专辑封面，确保正圆 */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', width: '40%', height: '40%', transform: 'translate(-50%,-50%)', borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', background: songCover ? 'transparent' : 'linear-gradient(135deg, #5464F5 0%, #e5a917 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {songCover ? <img src={songCover} alt="" crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
+          {songCover ? <img src={songCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
         </div>
       </div>
 
@@ -1632,8 +1613,8 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
           </div>
         </div>
       )}
-      {/* 音频元素 — 真实播放 */}
-      <audio ref={audioRef} src={audioSrc} preload="auto" />
+      {/* 音频元素 — key 确保切歌时重建 */}
+      {audioSrc && <audio key={audioSrc} ref={audioRef} src={audioSrc} preload="auto" style={{ position:'absolute', width:0, height:0, opacity:0, pointerEvents:'none' }} />}
     </main>
   )
 }

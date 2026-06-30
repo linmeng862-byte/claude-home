@@ -162,6 +162,22 @@ app.get('/api/kugou/detail', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }) }
 })
 
+// ── 专辑封面主色提取（后端用 sharp 绕过 CORS）──
+app.get('/api/music/color', async (req, res) => {
+  const { url } = req.query
+  if (!url) return res.json({ color: null })
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } })
+    if (!r.ok) return res.json({ color: null })
+    const buf = Buffer.from(await r.arrayBuffer())
+    const sharp = (await import('sharp')).default
+    // 缩小到 1x1 取主色
+    const { data } = await sharp(buf).resize(1, 1).raw().toBuffer({ resolveWithObject: true })
+    const color = `rgb(${data[0]},${data[1]},${data[2]})`
+    res.json({ color })
+  } catch (e) { res.json({ color: null }) }
+})
+
 // Spotify 搜索代理（需要 Client Credentials）
 app.get('/api/spotify/search', async (req, res) => {
   const { q, limit = 8 } = req.query
