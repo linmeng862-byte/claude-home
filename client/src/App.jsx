@@ -1,4 +1,30 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useReducer } from 'react'
+
+// ============ IME 输入法兼容 Hook ============
+// 解决中文/日文/韩文输入法在 React 受控输入中组字被中断的问题
+// 原理：IME 组字期间(composing)不更新 React state，等 compositionend 后再同步
+function useIMEInput(initialValue, setState) {
+  const ref = useRef({ composing: false, pending: null })
+  const handleChange = useCallback((e) => {
+    if (ref.current.composing) {
+      // 组字中：暂存到 pending，不更新 state（让 DOM 自由处理 IME）
+      ref.current.pending = e.target.value
+    } else {
+      setState(e.target.value)
+    }
+  }, [setState])
+  const compositionProps = {
+    onCompositionStart: useCallback(() => { ref.current.composing = true }, []),
+    onCompositionEnd: useCallback((e) => {
+      ref.current.composing = false
+      // 组字结束，把最终值同步回 React state
+      const finalValue = e.target.value
+      setState(finalValue)
+      ref.current.pending = null
+    }, [setState]),
+  }
+  return { handleChange, compositionProps }
+}
 import {
   Send, Plus, MessageSquare, Settings, Trash2,
   ChevronLeft, ChevronRight, Bot, User, Sparkles,
@@ -471,6 +497,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
     { id: 3, role: 'assistant', content: '今天有什么想聊的吗？', thinking: null, created_at: '2026-06-28T17:00:22' },
   ])
   const [inputValue, setInputValue] = useState('')
+  const chatIME = useIMEInput(inputValue, setInputValue)
   const [isTyping, setIsTyping] = useState(false)
   const [thinkingSheet, setThinkingSheet] = useState(null)
   const [pendingImage, setPendingImage] = useState(null)
@@ -599,7 +626,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
         <div className="ch-composer-inner" style={{background:dark?'rgba(44,44,46,0.9)':'rgba(255,255,255,0.92)',borderColor:dark?'rgba(255,255,255,0.08)':'rgba(60,60,67,0.1)'}}>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)'}}><Mic size={20}/></button>
           {pendingImage&&<div style={{position:'relative',padding:'2px 4px 0',flexShrink:0}}><img src={pendingImage} alt="" style={{height:32,borderRadius:6}}/><button onClick={()=>setPendingImage(null)} style={{position:'absolute',top:-2,right:-6,background:dark?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.1)',color:dark?'#fff':'#000',border:'none',borderRadius:'50%',width:16,height:16,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div>}
-          <textarea className="ch-composer-field" value={inputValue} onChange={e=>setInputValue(e.target.value)} onKeyDown={handleKeyDown} placeholder="Write a message…" rows={1} style={{color:dark?'#e5e5ea':'#1c1c1e'}}/>
+          <textarea className="ch-composer-field" value={inputValue} onChange={chatIME.handleChange} {...chatIME.compositionProps} onKeyDown={handleKeyDown} placeholder="Write a message…" rows={1} style={{color:dark?'#e5e5ea':'#1c1c1e'}}/>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)',fontSize:18}}>😊</button>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)'}} onClick={()=>imageInputRef.current?.click()}><Plus size={20}/></button>
           <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageUpload}/>
@@ -676,6 +703,7 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
   })
   const [allComments, setAllComments] = useState({}) // { postId: [{name, text}] }
   const [commentText, setCommentText] = useState('')
+  const commentIME = useIMEInput(commentText, setCommentText)
   const [commentingPostId, setCommentingPostId] = useState(null)
 
   // 监听 AI 发的朋友圈事件
@@ -787,7 +815,7 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
             {/* 评论输入 */}
             {commentingPostId === post.id ? (
               <div style={{ display: 'flex', gap: 8, padding: '0 0 8px', alignItems: 'center' }}>
-                <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                <input value={commentText} onChange={commentIME.handleChange} {...commentIME.compositionProps}
                   onKeyDown={e => { if(e.key==='Enter') submitComment(post.id, post.content) }}
                   placeholder="写评论..." autoFocus
                   style={{ flex: 1, background: ios.searchBg, color: ios.text, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
@@ -860,6 +888,8 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
+  const diaryTitleIME = useIMEInput(editTitle, setEditTitle)
+  const diaryContentIME = useIMEInput(editContent, setEditContent)
   const [showList, setShowList] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const diaryImageRef = useRef(null)
@@ -896,6 +926,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
   // 清单项编辑
   const [editingCheckIdx, setEditingCheckIdx] = useState(-1)
   const [editCheckText, setEditCheckText] = useState('')
+  const checkTextIME = useIMEInput(editCheckText, setEditCheckText)
 
   const startEditCheck = (idx) => {
     setEditingCheckIdx(idx)
@@ -993,8 +1024,8 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 80px' }}>
         {editing ? (
           <>
-            <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="标题" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 28, fontWeight: 700, color: n.text, fontFamily: n.sans, width: '100%', marginBottom: 8, letterSpacing: -0.5 }} />
-            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} placeholder="写点什么..." rows={10} style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: n.text, fontFamily: n.serif, width: '100%', resize: 'none', lineHeight: 1.8, letterSpacing: 0.2 }} />
+            <input value={editTitle} onChange={diaryTitleIME.handleChange} {...diaryTitleIME.compositionProps} placeholder="标题" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 28, fontWeight: 700, color: n.text, fontFamily: n.sans, width: '100%', marginBottom: 8, letterSpacing: -0.5 }} />
+            <textarea value={editContent} onChange={diaryContentIME.handleChange} {...diaryContentIME.compositionProps} placeholder="写点什么..." rows={10} style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: n.text, fontFamily: n.serif, width: '100%', resize: 'none', lineHeight: 1.8, letterSpacing: 0.2 }} />
           </>
         ) : (
           <>
@@ -1014,7 +1045,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
                       {item.done && <CheckCircle size={12} style={{ color: n.accent }} />}
                     </div>
                     {editingCheckIdx === i ? (
-                      <input value={editCheckText} onChange={e => setEditCheckText(e.target.value)} onBlur={saveEditCheck} onKeyDown={e => e.key === 'Enter' && saveEditCheck()} autoFocus
+                      <input value={editCheckText} onChange={checkTextIME.handleChange} {...checkTextIME.compositionProps} onBlur={saveEditCheck} onKeyDown={e => e.key === 'Enter' && saveEditCheck()} autoFocus
                         style={{ flex: 1, border: 'none', outline: 'none', background: 'rgba(120,120,128,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 15, color: n.text, fontFamily: n.serif }} />
                     ) : (
                       <span onClick={() => startEditCheck(i)} style={{ flex: 1, fontSize: 15, color: item.done ? n.textMuted : n.text, textDecoration: item.done ? 'line-through' : 'none', fontFamily: n.serif, cursor: 'text' }}>{item.text}</span>
@@ -1129,7 +1160,8 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
         )}
 
         {/* Brain 区块 — 漫游 / 反省 / 梦境（仅 Brain 已连接时显示） */}
-        {hasCookie && <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {hasCookie ? (
+        <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {brainSections.map(s => (
             <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: openSection[s.id] ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', transition: 'all 0.3s' }}>
               <div onClick={() => toggleSection(s.id)} style={{ padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -1153,14 +1185,15 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
                     </div>
                   ) : (
                     <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: 16, fontStyle: 'italic' }}>
-                      {hasCookie ? '暂无内容，Brain 正在消化记忆...' : '请先连接 Ombre Brain'}
+                      暂无内容，Brain 正在消化记忆...
                     </div>
                   )}
                 </div>
               )}
             </div>
           ))}
-        </div>}
+        </div>
+        ) : null}
       </div>
     </div>
   )
@@ -1174,6 +1207,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [embedUrl, setEmbedUrl] = useState('') // 不持久化 — 避免每次进入都弹 Spotify 浮窗
+  const musicSearchIME = useIMEInput(searchQ, setSearchQ)
   const [searchResults, setSearchResults] = useState([])
   const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
   const [searching, setSearching] = useState(false)
@@ -1464,7 +1498,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
+              <input value={searchQ} onChange={musicSearchIME.handleChange} {...musicSearchIME.compositionProps} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
               <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
@@ -1510,11 +1544,13 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
   const [selectedBook, setSelectedBook] = useState(0)
   const [highlighted, setHighlighted] = useState('')
   const [reflection, setReflection] = useState('')
+  const reflectionIME = useIMEInput(reflection, setReflection)
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768)
   const [aiNotes, setAiNotes] = useState([
     { id: 1, text: '这段话让人想起里尔克的那句："谁在这时没有房屋，就不必建筑。" 也许真正的自由并非拥有选择，而是不再需要选择。', anchor: '第3段' },
   ])
   const [searchQuery, setSearchQuery] = useState('')
+  const bookSearchIME = useIMEInput(searchQuery, setSearchQuery)
   const bookImportRef = useRef(null)
 
   const books = [
@@ -1596,7 +1632,7 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
         <div style={{ padding: '0 24px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: w.cardBg, border: `0.5px solid ${w.border}`, borderRadius: 10, padding: '8px 12px' }}>
             <Search size={14} style={{ color: w.textLight }} />
-            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索书籍或笔记..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: w.text, fontFamily: w.sans, width: '100%' }} />
+            <input value={searchQuery} onChange={bookSearchIME.handleChange} {...bookSearchIME.compositionProps} placeholder="搜索书籍或笔记..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: w.text, fontFamily: w.sans, width: '100%' }} />
           </div>
         </div>
 
@@ -1783,7 +1819,7 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: w.accentDeep, marginBottom: 12 }}>
                 {mode === 'self' ? '📝 写下你的感悟' : `💬 与 ${aiName || 'Claude'} 交流`}
               </div>
-              <textarea value={reflection} onChange={e => setReflection(e.target.value)} placeholder={mode === 'self' ? '这段文字让你想起了什么...' : `你想聊什么？选中文本也可以邀请 ${aiName || 'Claude'} 评论...`}
+              <textarea value={reflection} onChange={reflectionIME.handleChange} {...reflectionIME.compositionProps} placeholder={mode === 'self' ? '这段文字让你想起了什么...' : `你想聊什么？选中文本也可以邀请 ${aiName || 'Claude'} 评论...`}
                 rows={3} style={{ width: '100%', background: w.sidebarBg, color: w.text, border: `0.5px solid ${w.border}`, borderRadius: 12, padding: 14, fontSize: 14, fontFamily: w.sans, resize: 'vertical', lineHeight: 1.6, outline: 'none' }} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                 <button style={{ background: w.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1848,21 +1884,24 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
     </div>
   )
 
-  const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => (
-    <div style={{ marginBottom: rows ? 12 : 8 }}>
-      <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
-      {rows ? (
-        <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
-      ) : type === 'password' ? (
-        <input type="password" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-      ) : (
-        <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-      )}
-    </div>
-  )
+  const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => {
+    const ime = useIMEInput(value, onChange)
+    return (
+      <div style={{ marginBottom: rows ? 12 : 8 }}>
+        <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
+        {rows ? (
+          <textarea value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder} rows={rows}
+            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
+        ) : type === 'password' ? (
+          <input type="password" value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder}
+            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        ) : (
+          <input type="text" value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder}
+            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+        )}
+      </div>
+    )
+  }
 
   const Segmented = ({ options, value, onChange }) => (
     <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
@@ -1979,6 +2018,8 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
   const [logged, setLogged] = useState(false)
   const [pwd, setPwd] = useState('')
   const [cookie, setCookie] = useState('')
+  const memorySearchIME = useIMEInput(searchQ, setSearchQ)
+  const memoryPwdIME = useIMEInput(pwd, setPwd)
   const [evoData, setEvoData] = useState(null)
   const [evoSection, setEvoSection] = useState('persona')
   const [loading, setLoading] = useState(false)
@@ -2098,7 +2139,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 14, border: `0.5px solid ${ios.cardBorder}` }}>
                 <div style={{ fontSize: 13, color: ios.textMuted, marginBottom: 8 }}>需要登录 Ombre Brain</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="密码"
+                  <input type="password" value={pwd} onChange={memoryPwdIME.handleChange} {...memoryPwdIME.compositionProps} placeholder="密码"
                     style={{ flex: 1, background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                   <button onClick={handleLogin} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>登录</button>
                 </div>
@@ -2109,7 +2150,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: ios.inputBg, borderRadius: 8, padding: '8px 12px', border: `0.5px solid ${ios.inputBorder}` }}>
                   <Search size={14} style={{ color: ios.textMuted }} />
-                  <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} placeholder="搜索记忆..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: ios.text, width: '100%' }} />
+                  <input value={searchQ} onChange={memorySearchIME.handleChange} {...memorySearchIME.compositionProps} onKeyDown={e => e.key === 'Enter' && handleSearch()} placeholder="搜索记忆..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: ios.text, width: '100%' }} />
                 </div>
                 <button onClick={handleSearch} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>搜索</button>
               </div>
@@ -2133,7 +2174,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 14, border: `0.5px solid ${ios.cardBorder}` }}>
                 <div style={{ fontSize: 13, color: ios.textMuted, marginBottom: 8 }}>需要登录 Ombre Brain 查看进化数据</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="密码"
+                  <input type="password" value={pwd} onChange={memoryPwdIME.handleChange} {...memoryPwdIME.compositionProps} placeholder="密码"
                     style={{ flex: 1, background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                   <button onClick={handleLogin} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>登录</button>
                 </div>
