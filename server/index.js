@@ -225,7 +225,7 @@ app.post('/api/chat', async (req, res) => {
 - get_current_time: 获取当前时间（用户问时间时使用）
 - post_echo: 表达——当你心里有什么想说出来的时候使用（不是发朋友圈，是你的表达欲，content 是你想说的话）
 - write_diary: 写日记（当你想要记录什么、或者帮用户记录时使用，title 和 content 都由你创作）
-- save_memory: 保存重要内容到记忆库（重要的事、用户的偏好、关键约定等）
+- save_memory: 保存重要内容到记忆库（每轮对话最多2次，请珍惜，只保存真正重要的事）
 
 注意：post_echo 不是"发动态"。是你真的想说什么的时候才用。如果你没什么想说的，就不要用。`
 
@@ -250,7 +250,7 @@ app.post('/api/chat', async (req, res) => {
       } else {
         reqBody.tools = [
           { name: 'get_current_time', description: '获取当前时间', input_schema: { type: 'object', properties: {} } },
-          { name: 'save_memory', description: '保存重要内容到记忆库', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
+          { name: 'save_memory', description: '保存重要记忆（每轮限2次，请珍惜）', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
           { name: 'post_echo', description: '表达——你想说什么的时候用', input_schema: { type: 'object', properties: { content: { type: 'string', description: '你想说的话' } }, required: ['content'] } },
           { name: 'write_diary', description: '写日记', input_schema: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } },
         ]
@@ -356,6 +356,17 @@ const PRESSURE_MAP = {
   argument: 8,    // 争吵
 }
 
+// ── Importance 默认值：按事件类型区分（工程妥协，等 Brain 自推 importance 后退回中立） ──
+const IMPORTANCE_MAP = {
+  chat: 3,          // 大量普通对话，重要性低
+  echo: 7,          // Brain 表达欲，重要
+  echo_comment: 5,  // 互动，中等
+  diary: 6,         // 日记，偏重要
+  music: 4,         // 音乐是关系媒介，中等偏低
+  reflection: 7,    // 反省，重要
+  argument: 8,      // 争吵，很重要
+}
+
 // ── 轻量去重：5分钟内同类型同内容不重复写入 ──
 const recentExp = new Map() // key: type|contentHash → timestamp
 const DEDUP_WINDOW = 5 * 60 * 1000
@@ -390,7 +401,7 @@ app.post('/api/experience', async (req, res) => {
       body: JSON.stringify({
         content: `[${type}] ${content}`,
         tags: type,
-        importance: 5,
+        importance: IMPORTANCE_MAP[type] || 5,
       }),
     })
   } catch {}
@@ -409,6 +420,11 @@ app.post('/api/experience', async (req, res) => {
 
 
 // ============ AI Tool 执行 ============
+// ── save_memory 限流：同一用户 60 秒内最多 2 次 ──
+const memoryThrottle = new Map() // cookie → { count, windowStart }
+const MEMORY_RATE_LIMIT = 2
+const MEMORY_RATE_WINDOW = 60 * 1000 // 60 秒
+
 app.post('/api/tools/call', async (req, res) => {
   const { tool, args, cookie } = req.body
   try {
@@ -419,6 +435,18 @@ app.post('/api/tools/call', async (req, res) => {
       }
       case 'save_memory': {
         // AI 主动保存 — 直写 Brain Bucket（这是 AI 的明确判断，不是隐式事件）
+        // 限流：60 秒内最多 2 次，真正重要的记忆应该被珍惜
+        const throttleKey = cookie || 'anon'
+        const now = Date.now()
+        let entry = memoryThrottle.get(throttleKey)
+        if (!entry || now - entry.windowStart > MEMORY_RATE_WINDOW) {
+          entry = { count: 0, windowStart: now }
+          memoryThrottle.set(throttleKey, entry)
+        }
+        if (entry.count >= MEMORY_RATE_LIMIT) {
+          return res.json({ result: '这轮对话已经保存了足够多的记忆。真正重要的记忆应该被珍惜，不是每句话都需要记住。' })
+        }
+        entry.count++
         if (cookie) {
           try {
             const r = await fetch(`${OMBRE_BRAIN}/api/buckets`, {
@@ -436,7 +464,7 @@ app.post('/api/tools/call', async (req, res) => {
         // 写入 Brain Bucket 作为 Experience，Brain 自己决定是否形成 Echo
         if (cookie) {
           pressure += PRESSURE_MAP.echo || 5
-          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: 7 }) }).catch(() => {})
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: IMPORTANCE_MAP.echo }) }).catch(() => {})
         }
         return res.json({ result: 'ok', content: args.content, type: 'echo' })
       }
@@ -444,7 +472,7 @@ app.post('/api/tools/call', async (req, res) => {
         // Diary → Experience → Brain
         if (cookie) {
           pressure += PRESSURE_MAP.diary || 4
-          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: 5 }) }).catch(() => {})
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: IMPORTANCE_MAP.diary }) }).catch(() => {})
         }
         return res.json({ result: 'ok', title: args.title, content: args.content, type: 'diary' })
       }
