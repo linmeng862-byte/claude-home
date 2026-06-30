@@ -1317,18 +1317,49 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [playing, setPlaying] = useState(false)
   const [songTitle, setSongTitle] = useState(() => localStorage.getItem('bh_music_title') || '月光曲')
   const [songArtist, setSongArtist] = useState(() => localStorage.getItem('bh_music_artist') || aiName || 'Claude')
-  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_music_cover') || null) // 专辑封面URL
+  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_music_cover') || null)
   const [showSearch, setShowSearch] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [embedUrl, setEmbedUrl] = useState(() => localStorage.getItem('bh_music_embed') || '')
   const [searchResults, setSearchResults] = useState([])
-  const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
+  const [searchSource, setSearchSource] = useState('kugou') // kugou | itunes | spotify
+  const [searching, setSearching] = useState(false)
   // 真实音频播放
   const audioRef = useRef(null)
   const [audioSrc, setAudioSrc] = useState(() => localStorage.getItem('bh_music_audio') || '')
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
+  // 专辑主题色
+  const [themeColor, setThemeColor] = useState(() => localStorage.getItem('bh_music_themecolor') || '')
+
+  // 从专辑封面提取主色
+  const extractThemeColor = (imgUrl) => {
+    if (!imgUrl) return
+    try {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const size = 10 // 小尺寸足够取色
+        canvas.width = size; canvas.height = size
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, size, size)
+        const data = ctx.getImageData(0, 0, size, size).data
+        // 取四角 + 中心区域平均色
+        let r=0,g=0,b=0,count=0
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]; g += data[i+1]; b += data[i+2]; count++
+        }
+        r = Math.round(r/count); g = Math.round(g/count); b = Math.round(b/count)
+        const color = `rgb(${r},${g},${b})`
+        setThemeColor(color)
+        localStorage.setItem('bh_music_themecolor', color)
+      }
+      img.onerror = () => {}
+      img.src = imgUrl
+    } catch {}
+  }
 
   // 持久化当前歌曲信息
   useEffect(() => {
@@ -1342,62 +1373,68 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     else localStorage.removeItem('bh_music_audio')
   }, [songTitle, songArtist, songCover, embedUrl, audioSrc])
 
-  // 音频进度监听
+  // 音频进度监听 — 每次渲染都绑定确保 ref 有效
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
     const onTimeUpdate = () => { setCurrentTime(audio.currentTime); setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0) }
     const onLoadedMetadata = () => setDuration(audio.duration)
     const onEnded = () => setPlaying(false)
+    const onError = () => { setPlaying(false); console.warn('音频加载失败') }
     audio.addEventListener('timeupdate', onTimeUpdate)
     audio.addEventListener('loadedmetadata', onLoadedMetadata)
     audio.addEventListener('ended', onEnded)
-    return () => { audio.removeEventListener('timeupdate', onTimeUpdate); audio.removeEventListener('loadedmetadata', onLoadedMetadata); audio.removeEventListener('ended', onEnded) }
-  }, [audioSrc])
+    audio.addEventListener('error', onError)
+    return () => { audio.removeEventListener('timeupdate', onTimeUpdate); audio.removeEventListener('loadedmetadata', onLoadedMetadata); audio.removeEventListener('ended', onEnded); audio.removeEventListener('error', onError) }
+  })
 
   // 播放/暂停控制
   const playAttemptRef = useRef(false)
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !audioSrc) return
+    if (!audio) return
+    if (!audioSrc) return
     if (playing) {
       if (!playAttemptRef.current) { audio.currentTime = 0; playAttemptRef.current = true }
-      audio.play().catch(() => {})
+      audio.play().catch((e) => { console.warn('播放失败:', e); setPlaying(false) })
+    } else {
+      audio.pause()
     }
-    else { audio.pause() }
-  }, [playing]) // 只监听 playing 变化，不监听 audioSrc
+  }, [playing, audioSrc])
   // 新歌曲加载时重置播放标记
   useEffect(() => { playAttemptRef.current = false }, [audioSrc])
 
   // 格式化时间
   const fmtTime = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}` }
 
-  // 网易云音乐搜索（通过后端代理）
-  const handleNeteaseSearch = async () => {
+  // ── 酷狗音乐搜索（更可靠的中文音乐API）──
+  const handleKugouSearch = async () => {
     if (!searchQ.trim()) return
-    setSearchResults([])
+    setSearching(true); setSearchResults([])
     try {
-      const r = await fetch(`/api/music/search?q=${encodeURIComponent(searchQ)}&limit=10`)
+      const r = await fetch(`/api/kugou/search?q=${encodeURIComponent(searchQ)}&limit=10`)
       if (!r.ok) throw new Error(`请求失败 ${r.status}`)
       const d = await r.json()
-      const songs = d.result?.songs || []
+      const songs = d.data?.info || d.songs || []
       if (songs.length === 0) {
-        setSearchResults([{ id: '__empty', title: '未找到结果，试试其他关键词', artist: '', source: 'netease' }])
+        setSearchResults([{ id: '__empty', title: '未找到结果，试试其他关键词', artist: '', source: 'kugou' }])
       } else {
         setSearchResults(songs.map(s => ({
-          id: s.id, title: s.name, artist: s.artist, cover: s.cover,
-          album: s.album, source: 'netease'
+          id: s.hash || s.songid, title: s.songname || s.name, artist: s.singername || s.artist,
+          cover: s.album_img || s.albumid ? `https://img2.kugou.com/album/100/${s.album_id || ''}.jpg` : null,
+          album: s.album_name || s.album, duration: s.duration, source: 'kugou'
         })))
       }
     } catch (e) {
-      console.error('网易云搜索失败:', e)
-      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'netease' }])
-    }
+      console.error('酷狗搜索失败:', e)
+      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'kugou' }])
+    } finally { setSearching(false) }
   }
 
   // iTunes Search API
   const handleItunesSearch = async () => {
     if (!searchQ.trim()) return
+    setSearching(true); setSearchResults([])
     try {
       const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchQ)}&media=music&limit=8`)
       const d = await r.json()
@@ -1406,11 +1443,13 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         source: 'itunes', audioUrl: t.previewUrl
       })))
     } catch { setSearchResults([]) }
+    finally { setSearching(false) }
   }
 
-  // Spotify Search（通过后端代理 — 需要Spotify Client Credentials）
+  // Spotify Search（通过后端代理）
   const handleSpotifySearch = async () => {
     if (!searchQ.trim()) return
+    setSearching(true); setSearchResults([])
     try {
       const r = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQ)}&limit=8`)
       const d = await r.json()
@@ -1420,37 +1459,37 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         source: 'spotify'
       })))
     } catch { setSearchResults([]) }
+    finally { setSearching(false) }
   }
 
-  const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
+  const handleMusicSearch = searchSource === 'kugou' ? handleKugouSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
 
   // 选中歌曲：设封面到唱片中心 + 播放
   const selectSong = async (r) => {
-    setSongTitle(r.title)
-    setSongArtist(r.artist)
-    setShowSearch(false)
-    setPlaying(false)
+    setSongTitle(r.title); setSongArtist(r.artist); setShowSearch(false); setPlaying(false)
     // 设置音频源
     if (r.audioUrl) { setAudioSrc(r.audioUrl) }
-    else if (r.source === 'netease') {
-      // 网易云：尝试获取播放URL
+    else if (r.source === 'kugou') {
+      // 酷狗：通过后端获取播放URL
       try {
-        const ar = await fetch(`/api/music/url?id=${r.id}`)
+        const ar = await fetch(`/api/kugou/url?hash=${r.id}`)
         const ad = await ar.json()
         if (ad.url) setAudioSrc(ad.url)
         else setAudioSrc('')
       } catch { setAudioSrc('') }
     } else { setAudioSrc('') }
 
-    if (r.source === 'netease') {
-      // 通过后端获取高清封面
-      try {
-        const dr = await fetch(`/api/music/detail?id=${r.id}`)
-        const dd = await dr.json()
-        setSongCover(dd.cover || r.cover)
-      } catch { setSongCover(r.cover) }
+    // 设置封面
+    if (r.source === 'kugou') {
+      if (r.cover) setSongCover(r.cover)
+      else {
+        try {
+          const dr = await fetch(`/api/kugou/detail?hash=${r.id}`)
+          const dd = await dr.json()
+          setSongCover(dd.cover || dd.img || null)
+        } catch { setSongCover(null) }
+      }
     } else if (r.source === 'spotify') {
-      // Spotify：从 oEmbed API 获取封面
       try {
         const oer = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${r.id}`)
         const oed = await oer.json()
@@ -1463,22 +1502,23 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     }
   }
 
-  // 动态渐变背景
-  const bgGradients = [
-    'linear-gradient(135deg, #1a0533 0%, #0d1b2a 40%, #1b2838 100%)',
-    'linear-gradient(135deg, #2d1b4e 0%, #1a2a3a 40%, #0d2847 100%)',
-    'linear-gradient(135deg, #0a2e1f 0%, #1a3040 40%, #0d1b2a 100%)',
-  ]
-  const [bgIdx] = useState(0)
+  // 封面变化时提取主题色
+  useEffect(() => {
+    if (songCover) extractThemeColor(songCover)
+  }, [songCover])
 
   return (
-    <main style={{ position: 'fixed', inset: 0, background: bgGradients[bgIdx], color: '#f0eff5', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
-      {/* 背景光晕效果 */}
-      <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(90,60,180,0.25) 0%, transparent 70%)', top: '15%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,156,252,0.15) 0%, transparent 70%)', bottom: '25%', right: '10%', pointerEvents: 'none' }} />
+    <main style={{ position: 'fixed', inset: 0, background: themeColor
+      ? `radial-gradient(ellipse at 50% 30%, ${themeColor} 0%, rgba(0,0,0,0.85) 70%)`
+      : 'linear-gradient(135deg, #1a0533 0%, #0d1b2a 40%, #1b2838 100%)',
+      color: '#f0eff5', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'hidden' }}>
+      {/* 背景光晕效果 — 使用主题色 */}
+      <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: themeColor
+        ? `radial-gradient(circle, ${themeColor.replace('rgb','rgba').replace(')',',0.3)')} 0%, transparent 70%)`
+        : 'radial-gradient(circle, rgba(90,60,180,0.25) 0%, transparent 70%)', top: '15%', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
 
       {/* 返回按钮 */}
-      <button onClick={onBack} style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#f0eff5', cursor: 'pointer', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)' }}>
+      <button onClick={onBack} style={{ position: 'absolute', top: 16, left: 16, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#f0eff5', cursor: 'pointer', borderRadius: '50%', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(10px)', zIndex: 10 }}>
         <ArrowLeft size={18} />
       </button>
 
@@ -1492,27 +1532,28 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         </div>
       </div>
 
-      {/* 圆环唱片 — 封面自动渲染到中心 */}
-      <div style={{ position: 'relative', width: 320, height: 320 }} className={playing ? 'disc-spinning' : ''}>
+      {/* 圆环唱片 — 完美正圆 + 封面自动渲染到中心 */}
+      <div style={{ position: 'relative', width: 280, height: 280, aspectRatio: '1/1', flexShrink: 0 }} className={playing ? 'disc-spinning' : ''}>
+        {/* 外圈黑胶纹理 */}
         <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', border: '3px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 40px rgba(255,255,255,0.03)' }}>
           {Array.from({length:12}).map((_,i) => (
             <div key={i} style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `${0.3+i*0.02}px solid rgba(255,255,255,${0.04+i*0.01})`, margin: `${20+i*8}px` }} />
           ))}
         </div>
-        {/* 内圈 — 专辑封面图 或默认渐变 */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 130, height: 130, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', background: songCover ? 'transparent' : 'linear-gradient(135deg, #5464F5 0%, #e5a917 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {songCover ? <img src={songCover} alt="" crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
+        {/* 中心圆 — 专辑封面，确保正圆 */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', width: '40%', height: '40%', transform: 'translate(-50%,-50%)', borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', background: songCover ? 'transparent' : 'linear-gradient(135deg, #5464F5 0%, #e5a917 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {songCover ? <img src={songCover} alt="" crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
         </div>
       </div>
 
       {/* 歌曲信息 */}
-      <div style={{ textAlign: 'center', marginTop: 24 }}>
+      <div style={{ textAlign: 'center', marginTop: 20 }}>
         <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: 0.5 }}>{songTitle}</div>
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{songArtist}</div>
       </div>
 
       {/* 进度条 — 真实进度 */}
-      <div style={{ width: '80%', maxWidth: 300, marginTop: 24 }}>
+      <div style={{ width: '80%', maxWidth: 300, marginTop: 20 }}>
         <div style={{ height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2, position: 'relative', cursor: 'pointer' }}
           onClick={e => { const audio = audioRef.current; if (audio && duration) { const rect = e.currentTarget.getBoundingClientRect(); const x = e.clientX - rect.left; const pct = x / rect.width; audio.currentTime = pct * duration } }}>
           <div style={{ position: 'absolute', left: 0, top: 0, width: `${progress}%`, height: '100%', background: '#f0eff5', borderRadius: 2 }} />
@@ -1523,17 +1564,17 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       </div>
 
       {/* 控制按钮 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 32, marginTop: 16 }}>
         <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><SkipBack size={24} /></button>
-        <button onClick={() => setPlaying(!playing)}
-          style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
+        <button onClick={() => { if (!audioSrc && !embedUrl) { setShowSearch(true); return } setPlaying(!playing) }}
+          style={{ width: 56, height: 56, borderRadius: '50%', background: themeColor ? themeColor.replace('rgb','rgba').replace(')',',0.25)') : 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', backdropFilter: 'blur(10px)' }}>
           {playing ? <Pause size={22} style={{ color: '#f0eff5' }} /> : <Play size={22} style={{ color: '#f0eff5', marginLeft: 2 }} />}
         </button>
         <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.6)' }}><SkipForward size={24} /></button>
       </div>
 
       {/* 音量 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 20, width: '60%', maxWidth: 220 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, width: '60%', maxWidth: 220 }}>
         <Headphones size={14} style={{ color: 'rgba(255,255,255,0.4)' }} />
         <div style={{ flex: 1, height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2, position: 'relative' }}>
           <div style={{ position: 'absolute', left: 0, top: 0, width: '60%', height: '100%', background: 'rgba(255,255,255,0.5)', borderRadius: 2 }} />
@@ -1541,7 +1582,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       </div>
 
       {/* 搜索听歌 */}
-      <button onClick={() => setShowSearch(true)} style={{ marginTop: 16, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#f0eff5', borderRadius: 20, padding: '8px 20px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(10px)' }}>
+      <button onClick={() => setShowSearch(true)} style={{ marginTop: 12, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: '#f0eff5', borderRadius: 20, padding: '8px 20px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, backdropFilter: 'blur(10px)' }}>
         <Search size={14} /> 搜索歌曲
       </button>
 
@@ -1552,7 +1593,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         </div>
       )}
 
-      {/* 搜索弹窗 — 网易云 + iTunes 双源 */}
+      {/* 搜索弹窗 — 酷狗 + iTunes + Spotify 三源 */}
       {showSearch && (
         <div onClick={() => setShowSearch(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 400, background: '#1a1a2e', borderRadius: 16, padding: 20, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -1562,13 +1603,13 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
             </div>
             {/* 搜索源切换 */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setSearchSource('netease')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='netease'?600:400, background: searchSource==='netease'?'#e60026':'transparent', color: searchSource==='netease'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='netease'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>网易云</button>
+              <button onClick={() => setSearchSource('kugou')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='kugou'?600:400, background: searchSource==='kugou'?'#2ca5f6':'transparent', color: searchSource==='kugou'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='kugou'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>酷狗</button>
               <button onClick={() => setSearchSource('itunes')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='itunes'?600:400, background: searchSource==='itunes'?'#1DB954':'transparent', color: searchSource==='itunes'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='itunes'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>iTunes</button>
               <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder={searchSource==='netease'?'歌名 / 歌手...':searchSource==='spotify'?'歌名 / 歌手 / 专辑...':'歌名 / 歌手 / 专辑...'} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
-              <button onClick={handleMusicSearch} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>搜索</button>
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
+              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='kugou'?'#2ca5f6':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {searchResults.map((r, i) => (
@@ -1583,17 +1624,16 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
                   </div>
                 </div>
               ))}
-              {searchResults.length === 0 && searchQ && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: 16 }}>输入关键词搜索...</div>}
+              {searchResults.length === 0 && !searching && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: 16 }}>输入关键词后点击搜索</div>}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 10, lineHeight: 1.4 }}>
-              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { const trackId = m[1]; setEmbedUrl(`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`); setShowSearch(false); setPlaying(false); // 异步获取封面
-              fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`).then(r=>r.json()).then(d=>{ if(d.thumbnail_url) setSongCover(d.thumbnail_url.replace('60x60','640x640')) }).catch(()=>{}) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
+              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { const trackId = m[1]; setEmbedUrl(`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`); setShowSearch(false); setPlaying(false); fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`).then(r=>r.json()).then(d=>{ if(d.thumbnail_url) setSongCover(d.thumbnail_url.replace('60x60','640x640')) }).catch(()=>{}) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
             </div>
           </div>
         </div>
       )}
-      {/* 隐藏音频元素 — 真实播放 */}
-      {audioSrc && <audio ref={audioRef} src={audioSrc} preload="auto" style={{ display: 'none' }} />}
+      {/* 音频元素 — 真实播放 */}
+      <audio ref={audioRef} src={audioSrc} preload="auto" />
     </main>
   )
 }

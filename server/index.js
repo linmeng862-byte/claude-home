@@ -94,87 +94,72 @@ app.get('/api/memory/evolution/:section', async (req, res) => {
   catch (e) { res.status(502).json({ error: e.message }) }
 })
 
-// ── 网易云音乐搜索代理 ──
-app.get('/api/music/search', async (req, res) => {
+// ── 酷狗音乐搜索代理（更可靠的中文音乐搜索）──
+app.get('/api/kugou/search', async (req, res) => {
   const { q, limit = 10 } = req.query
-  if (!q) return res.json({ result: { songs: [] } })
+  if (!q) return res.json({ data: { info: [] } })
   try {
-    // 尝试方案1: 新版搜索接口 (更可靠)
-    const r = await fetch(`https://music.163.com/api/cloudsearch/pc?s=${encodeURIComponent(q)}&type=1&limit=${limit}&offset=0`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://music.163.com/',
-        'Cookie': 'MUSIC_U=; os=pc; appver=2.10.11;'
-      }
+    // 酷狗移动端搜索 API（公开可用）
+    const r = await fetch(`https://mobileservice.kugou.com/api/v3/search/song?keyword=${encodeURIComponent(q)}&pagesize=${limit}&page=1`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', Referer: 'https://m.kugou.com/' }
     })
     const d = await r.json()
-    // 优先取 cloudsearch 结果，回退到旧接口格式
-    const rawSongs = d.result?.songs || []
-    if (rawSongs.length > 0) {
-      const songs = rawSongs.map(s => ({
-        id: s.id, name: s.name,
-        artist: (s.ar || s.artists || []).map(a => a.name || a.ar?.name).join(' / '),
-        album: s.al?.name || s.album?.name, albumId: s.al?.id || s.album?.id,
-        cover: s.al?.picUrl || (s.album?.id ? `https://music.163.com/api/img/blur/${s.album.id}` : null),
-        duration: s.dt || s.duration
-      }))
-      return res.json({ result: { songs } })
-    }
-    // 方案1 无结果，尝试方案2: 旧版搜索接口
-    const r2 = await fetch(`https://music.163.com/api/search/get/web?s=${encodeURIComponent(q)}&type=1&limit=${limit}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://music.163.com/' }
-    })
-    const d2 = await r2.json()
-    const songs2 = (d2.result?.songs || []).map(s => ({
-      id: s.id, name: s.name,
-      artist: (s.artists || []).map(a => a.name).join(' / '),
-      album: s.album?.name, albumId: s.album?.id,
-      cover: s.album?.id ? `https://music.163.com/api/img/blur/${s.album.id}` : null,
+    const songs = d.data?.info || []
+    res.json({ data: { info: songs.map(s => ({
+      hash: s.hash, songid: s.songid, songname: s.songname,
+      singername: s.singername, album_name: s.album_name,
+      album_id: s.album_id, album_img: s.album_img,
       duration: s.duration
-    }))
-    res.json({ result: { songs: songs2 } })
-  } catch (e) { res.status(502).json({ error: e.message }) }
+    }))}})
+  } catch (e) {
+    // 回退方案: 酷狗PC搜索
+    try {
+      const r2 = await fetch(`https://songsearch.kugou.com/song_search_v2?keyword=${encodeURIComponent(q)}&pagesize=${limit}&page=1`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
+      })
+      const d2 = await r2.json()
+      const songs2 = d2.data?.lists || []
+      res.json({ data: { info: songs2.map(s => ({
+        hash: s.FileHash, songid: s.ID, songname: s.SongName,
+        singername: s.SingerName, album_name: s.AlbumName,
+        album_id: s.AlbumID, album_img: s.ImageUrl || null,
+        duration: s.Duration
+      }))}})
+    } catch (e2) { res.status(502).json({ error: e2.message }) }
+  }
 })
 
-// 网易云歌曲详情（含封面URL）
-app.get('/api/music/detail', async (req, res) => {
-  const { id } = req.query
-  if (!id) return res.json({})
+// 酷狗歌曲播放URL
+app.get('/api/kugou/url', async (req, res) => {
+  const { hash } = req.query
+  if (!hash) return res.json({ url: null })
   try {
-    const r = await fetch(`https://music.163.com/api/song/detail/?id=${id}&ids=%5B${id}%5D`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://music.163.com/' }
+    // 获取歌曲hash对应的播放URL
+    const r = await fetch(`https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash=${hash}&mid=1`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
     })
     const d = await r.json()
-    const song = d.songs?.[0]
-    res.json({
-      id: song?.id, name: song?.name,
-      artist: (song?.artists || []).map(a => a.name).join(' / '),
-      album: song?.album?.name,
-      cover: song?.album?.picUrl || song?.album?.blurPicUrl
-    })
-  } catch (e) { res.status(502).json({ error: e.message }) }
+    const url = d.data?.play_url || d.data?.url || null
+    res.json({ hash, url })
+  } catch (e) { res.json({ hash, url: null, error: e.message }) }
 })
 
-// 网易云歌曲播放URL
-app.get('/api/music/url', async (req, res) => {
-  const { id } = req.query
-  if (!id) return res.json({ url: null })
+// 酷狗歌曲详情（含封面）
+app.get('/api/kugou/detail', async (req, res) => {
+  const { hash } = req.query
+  if (!hash) return res.json({})
   try {
-    // 尝试多种接口获取播放URL
-    const endpoints = [
-      `https://music.163.com/api/song/enhance/player/url?id=${id}&ids=%5B${id}%5D&br=320000`,
-      `https://music.163.com/api/song/playurl?id=${id}&ids=%5B${id}%5D&br=320000`,
-    ]
-    for (const url of endpoints) {
-      const r = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://music.163.com/' }
-      })
-      const d = await r.json()
-      const songUrl = d.data?.[0]?.url || d.url || null
-      if (songUrl) return res.json({ id, url: songUrl })
-    }
-    res.json({ id, url: null })
-  } catch (e) { res.json({ id, url: null, error: e.message }) }
+    const r = await fetch(`https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash=${hash}&mid=1`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
+    })
+    const d = await r.json()
+    res.json({
+      hash, name: d.data?.song_name, artist: d.data?.author_name,
+      album: d.data?.album_name,
+      cover: d.data?.img || d.data?.album_img,
+      url: d.data?.play_url
+    })
+  } catch (e) { res.status(502).json({ error: e.message }) }
 })
 
 // Spotify 搜索代理（需要 Client Credentials）
