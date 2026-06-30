@@ -2,25 +2,18 @@ import React, { useState, useRef, useEffect, useCallback, useReducer } from 'rea
 
 // ============ IME 输入法兼容 Hook ============
 // 解决中文/日文/韩文输入法在 React 受控输入中组字被中断的问题
-// 原理：IME 组字期间(composing)不更新 React state，等 compositionend 后再同步
+// 策略：onChange 始终更新 state（保证移动端/英文输入正常显示），
+//       compositionEnd 时额外 flush 一次最终合成值，防止 PC 端拼音被截断。
 function useIMEInput(initialValue, setState) {
-  const ref = useRef({ composing: false, pending: null })
   const handleChange = useCallback((e) => {
-    if (ref.current.composing) {
-      // 组字中：暂存到 pending，不更新 state（让 DOM 自由处理 IME）
-      ref.current.pending = e.target.value
-    } else {
-      setState(e.target.value)
-    }
+    // 始终更新 state，移动端和英文输入完全正常
+    setState(e.target.value)
   }, [setState])
   const compositionProps = {
-    onCompositionStart: useCallback(() => { ref.current.composing = true }, []),
     onCompositionEnd: useCallback((e) => {
-      ref.current.composing = false
-      // 组字结束，把最终值同步回 React state
-      const finalValue = e.target.value
-      setState(finalValue)
-      ref.current.pending = null
+      // PC 端某些浏览器 compositionEnd 顺序晚于 onChange，
+      // 这里再 flush 一次，确保最终汉字写入 state
+      setState(e.target.value)
     }, [setState]),
   }
   return { handleChange, compositionProps }
