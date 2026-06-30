@@ -1202,7 +1202,8 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [embedUrl, setEmbedUrl] = useState('') // 不持久化 — 避免每次进入都弹 Spotify 浮窗
   const musicSearchIME = useIMEInput(searchQ, setSearchQ)
   const [searchResults, setSearchResults] = useState([])
-  const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
+  const [searchSource, setSearchSource] = useState('itunes') // netease | itunes | spotify
+  const localAudioRef = useRef(null) // 本地音频上传 input ref
   const [searching, setSearching] = useState(false)
   const [audioLoading, setAudioLoading] = useState(false) // 歌曲URL加载中
   // 真实音频播放
@@ -1268,7 +1269,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 格式化时间
   const fmtTime = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}` }
 
-  // ── 网易云音乐搜索（搜索 + 播放URL + 封面全链路可用）──
+  // ── 网易云音乐搜索（需后端 NeteaseCloudMusicApi 支持）──
   const handleNeteaseSearch = async () => {
     if (!searchQ.trim()) return
     setSearching(true); setSearchResults([])
@@ -1287,7 +1288,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       }
     } catch (e) {
       console.error('网易云搜索失败:', e)
-      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'netease' }])
+      setSearchResults([{ id: '__error', title: '网易云搜索暂不可用，建议使用 iTunes 源', artist: e.message, source: 'netease' }])
     } finally { setSearching(false) }
   }
 
@@ -1324,6 +1325,20 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
 
   const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
 
+  // 上传本地音乐文件
+  const handleLocalAudio = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    const name = file.name.replace(/\.[^.]+$/, '')
+    setSongTitle(name)
+    setSongArtist('本地音乐')
+    setAudioSrc(url)
+    setShowSearch(false)
+    setEmbedUrl('')
+    setPlaying(false)
+  }
+
   // 选中歌曲：设封面到唱片中心 + 获取URL后自动播放
   const selectSong = async (r) => {
     setSongTitle(r.title); setSongArtist(r.artist); setShowSearch(false); setPlaying(false)
@@ -1353,19 +1368,19 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         } catch { setSongCover(null) }
       }
     } else if (r.source === 'spotify') {
+      // Spotify 无法直接播放音频，只设置封面
       try {
         const oer = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${r.id}`)
         const oed = await oer.json()
         setSongCover(oed.thumbnail_url?.replace('60x60', '640x640') || r.cover)
       } catch { setSongCover(r.cover) }
-      setEmbedUrl(`https://open.spotify.com/embed/track/${r.id}?utm_source=generator&theme=0`)
+      // 不设置 embedUrl — Spotify iframe 在移动端体验差且无法控制
     } else {
       setSongCover(r.cover?.replace('100x100', '600x600') || r.cover)
     }
 
     // URL 就绪后自动播放
     if (url) {
-      // 需要等 React 把 <audio key={url}> 渲染出来，用 setTimeout 让 ref 生效
       setTimeout(() => {
         const audio = audioRef.current
         if (audio) {
@@ -1490,9 +1505,11 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               <button onClick={() => setSearchSource('itunes')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='itunes'?600:400, background: searchSource==='itunes'?'#1DB954':'transparent', color: searchSource==='itunes'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='itunes'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>iTunes</button>
               <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
+            {searchSource === 'netease' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>⚠️ 网易云需后端部署 NeteaseCloudMusicApi 才能搜索，否则请用 iTunes 源</div>}
+            {searchSource === 'spotify' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>Spotify 搜索无凭证时自动回退 iTunes，仅能播放 30 秒预览</div>}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               <input value={searchQ} onChange={musicSearchIME.handleChange} {...musicSearchIME.compositionProps} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
-              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
+              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1, minWidth: 56 }}>{searching?'...' : '搜索'}</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {searchResults.map((r, i) => (
@@ -1510,7 +1527,9 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               {searchResults.length === 0 && !searching && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: 16 }}>输入关键词后点击搜索</div>}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 10, lineHeight: 1.4 }}>
-              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { const trackId = m[1]; setEmbedUrl(`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`); setShowSearch(false); setPlaying(false); fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`).then(r=>r.json()).then(d=>{ if(d.thumbnail_url) setSongCover(d.thumbnail_url.replace('60x60','640x640')) }).catch(()=>{}) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
+              📁 也可以上传本地音乐：
+              <button onClick={() => localAudioRef.current?.click()} style={{ marginTop: 6, width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, cursor: 'pointer' }}>选择本地 MP3 文件</button>
+              <input ref={localAudioRef} type="file" accept="audio/*" hidden onChange={handleLocalAudio} />
             </div>
           </div>
         </div>
@@ -1878,18 +1897,38 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
   )
 
   const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => {
-    const ime = useIMEInput(value, onChange)
+    const composingRef = useRef(false)
+    const inputRef = useRef(null)
+    // 使用 ref 跟踪最新 value，避免闭包陷阱
+    const valueRef = useRef(value)
+    valueRef.current = value
+
+    const handleInput = useCallback((e) => {
+      if (composingRef.current) {
+        // IME 组字中：仍然更新 state，否则移动端输入框会空白
+        onChange(e.target.value)
+      } else {
+        onChange(e.target.value)
+      }
+    }, [onChange])
+
+    const handleCompositionEnd = useCallback((e) => {
+      composingRef.current = false
+      // PC 端：flush 最终汉字值
+      onChange(e.target.value)
+    }, [onChange])
+
     return (
       <div style={{ marginBottom: rows ? 12 : 8 }}>
         <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
         {rows ? (
-          <textarea value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder} rows={rows}
+          <textarea value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder} rows={rows}
             style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
         ) : type === 'password' ? (
-          <input type="password" value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder}
+          <input type="password" value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder}
             style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
         ) : (
-          <input type="text" value={value} onChange={ime.handleChange} {...ime.compositionProps} placeholder={placeholder}
+          <input type="text" value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder}
             style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
         )}
       </div>
