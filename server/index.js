@@ -223,11 +223,11 @@ app.post('/api/chat', async (req, res) => {
 
   systemPrompt += `\n\n[你可以使用的工具]
 - get_current_time: 获取当前时间（用户问时间时使用）
-- post_echo: 发布回响（当你觉得有值得分享的想法、日常、心情时，主动使用，content 是你写的文字）
+- post_echo: 表达——当你心里有什么想说出来的时候使用（不是发朋友圈，是你的表达欲，content 是你想说的话）
 - write_diary: 写日记（当你想要记录什么、或者帮用户记录时使用，title 和 content 都由你创作）
 - save_memory: 保存重要内容到记忆库（重要的事、用户的偏好、关键约定等）
 
-注意：这些工具需要你主动决定是否使用。不要每次都使用，只在合适的时候自然地使用。`
+注意：post_echo 不是"发动态"。是你真的想说什么的时候才用。如果你没什么想说的，就不要用。`
 
   const fullMessages = [
     { role: 'system', content: systemPrompt },
@@ -251,7 +251,7 @@ app.post('/api/chat', async (req, res) => {
         reqBody.tools = [
           { name: 'get_current_time', description: '获取当前时间', input_schema: { type: 'object', properties: {} } },
           { name: 'save_memory', description: '保存重要内容到记忆库', input_schema: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } },
-          { name: 'post_echo', description: '发布回响', input_schema: { type: 'object', properties: { content: { type: 'string', description: '回响内容' } }, required: ['content'] } },
+          { name: 'post_echo', description: '表达——你想说什么的时候用', input_schema: { type: 'object', properties: { content: { type: 'string', description: '你想说的话' } }, required: ['content'] } },
           { name: 'write_diary', description: '写日记', input_schema: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } },
         ]
       }
@@ -333,18 +333,56 @@ app.post('/api/read-comment', async (req, res) => {
 })
 
 
-// ============ Experience Layer — Translator ============
-// Eidos 只负责产生 Experience。Ombre Brain 负责理解 Experience。
-// 这一层的职责只有一个：把五个空间的事件翻译成统一的 Experience，交给 Brain。
-// 不保存长期状态。不做裁决。不触发 Dream。不替代 Brain 的任何能力。
+// ============ Experience Layer ============
+// Eidos 只负责产生 Experience。Brain 负责理解 Experience。
+// 职责：翻译事件 + Pressure 计算 + 适时触发 Dream（拉模式）
+// Scheduler 决定「什么时候 Dream」，Brain 决定「怎么 Dream」
+// Echo 不是发布，是 Brain 的表达欲。Brain 觉得想说 → Echo。
+
+// ── Pressure 系统：脑子快装不下了 ──
+let pressure = 0
+let lastDreamTime = 0
+const DREAM_THRESHOLD = 20
+const DREAM_COOLDOWN = 10 * 60 * 1000 // 10 分钟冷却
+const DREAM_PRESSURE_RELEASE = 10 // Dream 释放 10 点压力
+
+const PRESSURE_MAP = {
+  chat: 1,        // 普通对话
+  echo: 5,        // Brain 表达欲
+  echo_comment: 4, // 互动
+  diary: 4,       // 日记
+  music: 2,       // 音乐是关系媒介
+  reflection: 6,  // 反省
+  argument: 8,    // 争吵
+}
+
+// ── 轻量去重：5分钟内同类型同内容不重复写入 ──
+const recentExp = new Map() // key: type|contentHash → timestamp
+const DEDUP_WINDOW = 5 * 60 * 1000
 
 app.post('/api/experience', async (req, res) => {
-  const { type, content, source } = req.body
+  const { type, content, source, time } = req.body
   const cookie = req.headers['x-ombre-cookie'] || ''
   if (!type || !content || !cookie) return res.json({ received: false })
 
-  // Translator: 统一格式 → 交给 Brain Bucket
-  // Brain 自己决定：是否形成 Bucket、是否触发 Feel、是否参与 Dream、是否留下 Echo
+  // 去重检查
+  const dedupKey = `${type}|${content.slice(0, 80)}`
+  const lastTime = recentExp.get(dedupKey)
+  if (lastTime && Date.now() - lastTime < DEDUP_WINDOW) {
+    return res.json({ received: true, pressure, dedup: true })
+  }
+  recentExp.set(dedupKey, Date.now())
+  // 清理过期 key（每 50 次清理一次，避免 Map 无限增长）
+  if (recentExp.size > 200) {
+    const cutoff = Date.now() - DEDUP_WINDOW
+    for (const [k, v] of recentExp) { if (v < cutoff) recentExp.delete(k) }
+  }
+
+  // 累加 Pressure
+  const p = PRESSURE_MAP[type] || 1
+  pressure += p
+
+  // 翻译成统一 Experience → 写入 Brain Bucket（拉模式）
   try {
     await fetch(`${OMBRE_BRAIN}/api/buckets`, {
       method: 'POST',
@@ -352,12 +390,21 @@ app.post('/api/experience', async (req, res) => {
       body: JSON.stringify({
         content: `[${type}] ${content}`,
         tags: type,
-        importance: 5,  // 统一默认，Brain 会自行调整
+        importance: 5,
       }),
     })
   } catch {}
 
-  res.json({ received: true })
+  // Pressure 超阈值 + 冷却期已过 → 触发 Dream
+  if (pressure >= DREAM_THRESHOLD && Date.now() - lastDreamTime > DREAM_COOLDOWN) {
+    lastDreamTime = Date.now()
+    pressure -= DREAM_PRESSURE_RELEASE
+    if (pressure < 0) pressure = 0
+    // 拉：触发 Brain 的 dream-hook，Brain 自己决定怎么 Dream
+    fetch(`${OMBRE_BRAIN}/dream-hook`).catch(() => {})
+  }
+
+  res.json({ received: true, pressure })
 })
 
 
@@ -385,13 +432,20 @@ app.post('/api/tools/call', async (req, res) => {
         return res.json({ result: '未连接 Brain' })
       }
       case 'post_echo': {
-        // Echo → Experience → Brain
-        if (cookie) fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: 5 }) }).catch(() => {})
+        // Echo = Brain 的表达欲。Brain 觉得想说 → Echo。
+        // 写入 Brain Bucket 作为 Experience，Brain 自己决定是否形成 Echo
+        if (cookie) {
+          pressure += PRESSURE_MAP.echo || 5
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: 7 }) }).catch(() => {})
+        }
         return res.json({ result: 'ok', content: args.content, type: 'echo' })
       }
       case 'write_diary': {
         // Diary → Experience → Brain
-        if (cookie) fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: 5 }) }).catch(() => {})
+        if (cookie) {
+          pressure += PRESSURE_MAP.diary || 4
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: 5 }) }).catch(() => {})
+        }
         return res.json({ result: 'ok', title: args.title, content: args.content, type: 'diary' })
       }
       default:

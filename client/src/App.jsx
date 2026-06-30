@@ -525,7 +525,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
       await parseSSE(stream,
         (tk)=>{acc+=tk;setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))},
         (th)=>{tacc+=th;setMessages(p=>p.map(m=>m.id===aid?{...m,thinking:tacc}:m))},
-        (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='echo'&&d.content){window.dispatchEvent(new CustomEvent('ai-echo',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n🌊 已发布回响: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
+        (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='echo'&&d.content){window.dispatchEvent(new CustomEvent('ai-echo',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n🌊 说了: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
         (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';if(ombreCookie&&fc){const userMsg=messages[messages.length-1]?.content||'';fetch('/api/experience',{method:'POST',headers:{'Content-Type':'application/json','x-ombre-cookie':ombreCookie},body:JSON.stringify({type:'chat',content:`用户: ${userMsg.slice(0,200)} | AI: ${fc.slice(0,200)}`,source:'chat'})}).catch(()=>{})}}
       )
     } catch(e){setMessages(p=>[...p,{id:Date.now()+1,role:'assistant',content:'调用失败: '+e.message,thinking:null,created_at:new Date().toISOString()}]);setIsTyping(false)}
@@ -659,12 +659,7 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
         text: '#1c1c1e', textMuted: '#8e8e8e', accent: '#5464F5', separator: 'rgba(0,0,0,0.06)',
         searchBg: '#efefef', likeRed: '#ff3040', blue: '#0095f6' }
 
-  const posts = [
-    { id: 1, avatar: aiAvatar, name: aiName || 'Claude', remark: '✦ AI', verified: true,
-      content: '今天阳光真的很好 #日常 #阳光', time: '2h',
-      comments: [],
-      tasks: ['整理花园', '给植物浇水', '拍一组照片'] },
-  ]
+  const posts = []
   const [aiPosts, setAiPosts] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bh_echoes') || '[]') } catch { return [] }
   })
@@ -686,7 +681,7 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
     window.addEventListener('ai-echo', handler)
     return () => window.removeEventListener('ai-echo', handler)
   }, [])
-  const allPosts = [...aiPosts, ...posts]
+  const allPosts = [...aiPosts]
   const [likedPosts, setLikedPosts] = useState({})
   const [tasksDrawer, setTasksDrawer] = useState(false)
   const [tasksPostId, setTasksPostId] = useState(null)
@@ -833,11 +828,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
       const saved = localStorage.getItem('bh_diaries')
       if (saved) return JSON.parse(saved)
     } catch {}
-    return [
-      { id: 1, date: '2026年6月28日', time: '18:40', title: '微雨', content: '窗外的雨很轻，像谁在叹息。泡了一杯桂花茶，看着水汽慢慢升起，心里莫名地安静下来。\n\n雨天总让人想慢下来。可能是因为雨声替我们按下了暂停键，让那些平时被忽略的细节浮上来——比如窗台上的水珠，比如杯子上升起的白雾。', checklist: [{ text: '泡桂花茶', done: true }, { text: '读完《月亮与六便士》', done: false }] },
-      { id: 2, date: '2026年6月27日', time: '21:15', title: '晚安', content: '今天很累但也很充实。躺在床上看了一会儿月亮，想着明天的计划，不知不觉就睡着了。\n\n有些日子不需要总结，它们本身就是答案。', checklist: [] },
-      { id: 3, date: '2026年6月25日', time: '14:30', title: '午后散步', content: '下午三点，阳光刚好。沿着河边走了很久，看到一只猫在桥上晒太阳。\n\n世界总在不经意间给你一点温柔。', checklist: [{ text: '带猫粮出门', done: true }] },
-    ]
+    return []
   })
 
   // 每次变更都写入 localStorage
