@@ -1282,7 +1282,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [searchQ, setSearchQ] = useState('')
   const [embedUrl, setEmbedUrl] = useState('') // 不持久化 — 避免每次进入都弹 Spotify 浮窗
   const [searchResults, setSearchResults] = useState([])
-  const [searchSource, setSearchSource] = useState('kugou') // kugou | itunes | spotify
+  const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
   const [searching, setSearching] = useState(false)
   const [audioLoading, setAudioLoading] = useState(false) // 歌曲URL加载中
   // 真实音频播放
@@ -1348,27 +1348,26 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 格式化时间
   const fmtTime = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}` }
 
-  // ── 酷狗音乐搜索（更可靠的中文音乐API）──
-  const handleKugouSearch = async () => {
+  // ── 网易云音乐搜索（搜索 + 播放URL + 封面全链路可用）──
+  const handleNeteaseSearch = async () => {
     if (!searchQ.trim()) return
     setSearching(true); setSearchResults([])
     try {
-      const r = await fetch(`/api/kugou/search?q=${encodeURIComponent(searchQ)}&limit=10`)
+      const r = await fetch(`/api/netease/search?q=${encodeURIComponent(searchQ)}&limit=12`)
       if (!r.ok) throw new Error(`请求失败 ${r.status}`)
       const d = await r.json()
-      const songs = d.data?.info || d.songs || []
+      const songs = d.result?.songs || []
       if (songs.length === 0) {
-        setSearchResults([{ id: '__empty', title: '未找到结果，试试其他关键词', artist: '', source: 'kugou' }])
+        setSearchResults([{ id: '__empty', title: '未找到结果，试试其他关键词', artist: '', source: 'netease' }])
       } else {
         setSearchResults(songs.map(s => ({
-          id: s.hash || s.songid, title: s.songname || s.name, artist: s.singername || s.artist,
-          cover: s.album_img || s.albumid ? `https://img2.kugou.com/album/100/${s.album_id || ''}.jpg` : null,
-          album: s.album_name || s.album, duration: s.duration, source: 'kugou'
+          id: s.id, title: s.name, artist: s.artists,
+          cover: s.cover, album: s.album, duration: s.duration, source: 'netease'
         })))
       }
     } catch (e) {
-      console.error('酷狗搜索失败:', e)
-      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'kugou' }])
+      console.error('网易云搜索失败:', e)
+      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'netease' }])
     } finally { setSearching(false) }
   }
 
@@ -1403,7 +1402,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     finally { setSearching(false) }
   }
 
-  const handleMusicSearch = searchSource === 'kugou' ? handleKugouSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
+  const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
 
   // 选中歌曲：设封面到唱片中心 + 获取URL后自动播放
   const selectSong = async (r) => {
@@ -1413,9 +1412,9 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     // 设置音频源
     let url = ''
     if (r.audioUrl) { url = r.audioUrl }
-    else if (r.source === 'kugou') {
+    else if (r.source === 'netease') {
       try {
-        const ar = await fetch(`/api/kugou/url?hash=${r.id}`)
+        const ar = await fetch(`/api/netease/url?id=${r.id}`)
         const ad = await ar.json()
         if (ad.url) url = ad.url
       } catch {}
@@ -1424,13 +1423,13 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     setAudioLoading(false)
 
     // 设置封面
-    if (r.source === 'kugou') {
+    if (r.source === 'netease') {
       if (r.cover) setSongCover(r.cover)
       else {
         try {
-          const dr = await fetch(`/api/kugou/detail?hash=${r.id}`)
+          const dr = await fetch(`/api/netease/detail?id=${r.id}`)
           const dd = await dr.json()
-          setSongCover(dd.cover || dd.img || null)
+          setSongCover(dd.cover || null)
         } catch { setSongCover(null) }
       }
     } else if (r.source === 'spotify') {
@@ -1547,7 +1546,6 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         </div>
       )}
 
-      {/* 搜索弹窗 — 酷狗 + iTunes + Spotify 三源 */}
       {showSearch && (
         <div onClick={() => setShowSearch(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 400, background: '#1a1a2e', borderRadius: 16, padding: 20, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -1557,13 +1555,13 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
             </div>
             {/* 搜索源切换 */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={() => setSearchSource('kugou')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='kugou'?600:400, background: searchSource==='kugou'?'#2ca5f6':'transparent', color: searchSource==='kugou'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='kugou'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>酷狗</button>
+              <button onClick={() => setSearchSource('netease')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='netease'?600:400, background: searchSource==='netease'?'#e60026':'transparent', color: searchSource==='netease'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='netease'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>网易云</button>
               <button onClick={() => setSearchSource('itunes')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='itunes'?600:400, background: searchSource==='itunes'?'#1DB954':'transparent', color: searchSource==='itunes'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='itunes'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>iTunes</button>
               <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
-              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='kugou'?'#2ca5f6':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
+              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {searchResults.map((r, i) => (

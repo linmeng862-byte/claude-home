@@ -94,72 +94,53 @@ app.get('/api/memory/evolution/:section', async (req, res) => {
   catch (e) { res.status(502).json({ error: e.message }) }
 })
 
-// ── 酷狗音乐搜索代理（更可靠的中文音乐搜索）──
-app.get('/api/kugou/search', async (req, res) => {
-  const { q, limit = 10 } = req.query
-  if (!q) return res.json({ data: { info: [] } })
+// ── 网易云音乐搜索代理（搜索 + 播放URL + 封面全链路可用）──
+const NETEASE_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  Referer: 'https://music.163.com/',
+  Cookie: 'MUSIC_U=;',
+}
+
+app.get('/api/netease/search', async (req, res) => {
+  const { q, limit = 12 } = req.query
+  if (!q) return res.json({ result: { songs: [] } })
   try {
-    // 酷狗移动端搜索 API（公开可用）
-    const r = await fetch(`https://mobileservice.kugou.com/api/v3/search/song?keyword=${encodeURIComponent(q)}&pagesize=${limit}&page=1`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', Referer: 'https://m.kugou.com/' }
-    })
+    const r = await fetch(`https://music.163.com/api/search/get/web?s=${encodeURIComponent(q)}&type=1&limit=${limit}&offset=0`, { headers: NETEASE_HEADERS })
     const d = await r.json()
-    const songs = d.data?.info || []
-    res.json({ data: { info: songs.map(s => ({
-      hash: s.hash, songid: s.songid, songname: s.songname,
-      singername: s.singername, album_name: s.album_name,
-      album_id: s.album_id, album_img: s.album_img,
-      duration: s.duration
-    }))}})
-  } catch (e) {
-    // 回退方案: 酷狗PC搜索
-    try {
-      const r2 = await fetch(`https://songsearch.kugou.com/song_search_v2?keyword=${encodeURIComponent(q)}&pagesize=${limit}&page=1`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
-      })
-      const d2 = await r2.json()
-      const songs2 = d2.data?.lists || []
-      res.json({ data: { info: songs2.map(s => ({
-        hash: s.FileHash, songid: s.ID, songname: s.SongName,
-        singername: s.SingerName, album_name: s.AlbumName,
-        album_id: s.AlbumID, album_img: s.ImageUrl || null,
-        duration: s.Duration
-      }))}})
-    } catch (e2) { res.status(502).json({ error: e2.message }) }
-  }
+    const songs = (d.result?.songs || []).map(s => ({
+      id: s.id, name: s.name,
+      artists: (s.artists || []).map(a => a.name).join(' / '),
+      album: s.album?.name, albumId: s.album?.id,
+      cover: s.album?.blurPicUrl || s.album?.picUrl || `https://p1.music.126.net/${s.album?.picStr || ''}/${s.album?.id}.jpg`,
+      duration: s.duration ? Math.round(s.duration / 1000) : 0,
+    }))
+    res.json({ result: { songs } })
+  } catch (e) { res.json({ result: { songs: [] }, error: e.message }) }
 })
 
-// 酷狗歌曲播放URL
-app.get('/api/kugou/url', async (req, res) => {
-  const { hash } = req.query
-  if (!hash) return res.json({ url: null })
+app.get('/api/netease/url', async (req, res) => {
+  const { id } = req.query
+  if (!id) return res.json({ url: null })
   try {
-    // 获取歌曲hash对应的播放URL
-    const r = await fetch(`https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash=${hash}&mid=1`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
-    })
+    const r = await fetch(`https://music.163.com/api/song/enhance/player/url?id=${id}&ids=%5B${id}%5D&br=320000`, { headers: NETEASE_HEADERS })
     const d = await r.json()
-    const url = d.data?.play_url || d.data?.url || null
-    res.json({ hash, url })
-  } catch (e) { res.json({ hash, url: null, error: e.message }) }
+    const url = d.data?.[0]?.url || null
+    res.json({ id, url })
+  } catch (e) { res.json({ id, url: null, error: e.message }) }
 })
 
-// 酷狗歌曲详情（含封面）
-app.get('/api/kugou/detail', async (req, res) => {
-  const { hash } = req.query
-  if (!hash) return res.json({})
+app.get('/api/netease/detail', async (req, res) => {
+  const { id } = req.query
+  if (!id) return res.json({})
   try {
-    const r = await fetch(`https://wwwapi.kugou.com/yy/index.php?r=play/getdata&hash=${hash}&mid=1`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', Referer: 'https://www.kugou.com/' }
-    })
+    const r = await fetch(`https://music.163.com/api/song/detail?id=${id}&ids=%5B${id}%5D`, { headers: NETEASE_HEADERS })
     const d = await r.json()
+    const s = d.songs?.[0]
     res.json({
-      hash, name: d.data?.song_name, artist: d.data?.author_name,
-      album: d.data?.album_name,
-      cover: d.data?.img || d.data?.album_img,
-      url: d.data?.play_url
+      id, name: s?.name, artist: (s?.artists || []).map(a => a.name).join(' / '),
+      album: s?.album?.name, cover: s?.album?.blurPicUrl || s?.album?.picUrl,
     })
-  } catch (e) { res.status(502).json({ error: e.message }) }
+  } catch (e) { res.json({ id, error: e.message }) }
 })
 
 // ── 专辑封面主色提取（后端用 sharp 绕过 CORS）──
