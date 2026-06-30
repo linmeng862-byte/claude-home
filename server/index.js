@@ -367,23 +367,25 @@ const IMPORTANCE_MAP = {
   argument: 8,      // 争吵，很重要
 }
 
-// ── 轻量去重：5分钟内同类型同内容不重复写入 ──
+// ── 轻量去重：同类型同内容在窗口内不重复写入 ──
 const recentExp = new Map() // key: type|contentHash → timestamp
-const DEDUP_WINDOW = 5 * 60 * 1000
+const DEDUP_WINDOW = 5 * 60 * 1000  // 默认 5 分钟
+const DEDUP_WINDOWS = { music: 15 * 60 * 1000 } // Music 15 分钟 — 快速切歌不是经历
 
 app.post('/api/experience', async (req, res) => {
   const { type, content, source, time } = req.body
   const cookie = req.headers['x-ombre-cookie'] || ''
   if (!type || !content || !cookie) return res.json({ received: false })
 
-  // 去重检查
+  // 去重检查 — Music 用更长窗口
   const dedupKey = `${type}|${content.slice(0, 80)}`
+  const window = DEDUP_WINDOWS[type] || DEDUP_WINDOW
   const lastTime = recentExp.get(dedupKey)
-  if (lastTime && Date.now() - lastTime < DEDUP_WINDOW) {
+  if (lastTime && Date.now() - lastTime < window) {
     return res.json({ received: true, pressure, dedup: true })
   }
   recentExp.set(dedupKey, Date.now())
-  // 清理过期 key（每 50 次清理一次，避免 Map 无限增长）
+  // 清理过期 key
   if (recentExp.size > 200) {
     const cutoff = Date.now() - DEDUP_WINDOW
     for (const [k, v] of recentExp) { if (v < cutoff) recentExp.delete(k) }

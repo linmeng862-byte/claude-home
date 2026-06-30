@@ -423,7 +423,7 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
               <span className="ios-app-label" style={{ color: ios.text }}>{app.name}</span>
             </div>
           ))}
-        </div>
+        </div>}
 
         {/* 昼夜 + 颜色 */}
         <div className="ios-home-controls" style={{ borderColor: ios.separator }}>
@@ -661,7 +661,18 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
 
   const posts = []
   const [aiPosts, setAiPosts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bh_echoes') || '[]') } catch { return [] }
+    // 迁移旧 key：bh_moments → bh_echoes
+    try {
+      const saved = JSON.parse(localStorage.getItem('bh_echoes') || '[]')
+      if (saved.length === 0) {
+        const old = JSON.parse(localStorage.getItem('bh_moments') || '[]')
+        if (old.length > 0) { localStorage.setItem('bh_echoes', JSON.stringify(old)); localStorage.removeItem('bh_moments'); return old }
+      }
+      return saved
+    } catch {
+      try { localStorage.removeItem('bh_moments') } catch {}
+      return []
+    }
   })
   const [allComments, setAllComments] = useState({}) // { postId: [{name, text}] }
   const [commentText, setCommentText] = useState('')
@@ -718,6 +729,15 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
 
       {/* 推荐卡片 */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 60 }}>
+        {allPosts.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: ios.textMuted }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>✦</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: ios.text, marginBottom: 8 }}>安静的时刻</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 240, margin: '0 auto' }}>
+              TA 还没有想说什么。<br/>这不是朋友圈，是表达欲。当 TA 心里有话的时候，Echo 会自然出现。
+            </div>
+          </div>
+        )}
         {allPosts.map(post => (
           <div key={post.id} style={{ background: ios.cardBg, borderBottom: `0.5px solid ${ios.separator}`, padding: '0 16px' }}>
             {/* 用户信息 — 无关注按钮 */}
@@ -915,6 +935,15 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
 
       {/* 日记列表 — 支持左滑删除 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 0 40px' }}>
+        {diaries.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: n.textMuted }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>📝</div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: n.text, marginBottom: 8 }}>还没有日记</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6, maxWidth: 240, margin: '0 auto' }}>
+              第一篇日记什么时候写都好。<br/>可以是你写的，也可以请 TA 帮你记录。
+            </div>
+          </div>
+        )}
         {diaries.map((d, i) => (
           <div key={d.id} onClick={() => { setActiveDiary(i); setShowList(false) }} style={{ padding: '12px 16px', borderBottom: `0.5px solid ${n.separator}`, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1084,18 +1113,23 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
           </div>
         </div>
 
-        {/* 未连接 Brain 的提示 */}
+        {/* 未连接 Brain — 安静的空状态 */}
         {!hasCookie && (
-          <div style={{ margin: '24px 20px', background: 'rgba(255,200,50,0.08)', borderRadius: 12, padding: '16px 18px', border: '1px solid rgba(255,200,50,0.15)' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#ffc832' }}>⚠️ 未连接 Ombre Brain</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 6, lineHeight: 1.5 }}>
-              Thinking 完全依赖 Ombre Brain 的输出。请先在 Memory 页面登录 Brain，理解才会在这里出现。
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <div style={{ width: 64, height: 64, margin: '0 auto 16px', borderRadius: '50%', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>🧠</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>Thinking needs Brain</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginTop: 8, lineHeight: 1.7, maxWidth: 280, margin: '8px auto 0' }}>
+              连接 Ombre Brain 后，这里会展现 TA 的漫游联想、反省记录和梦境碎片。
+              <br />理解不会凭空产生，它需要真实的生活。
             </div>
+            <button onClick={onBack} style={{ marginTop: 20, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 10, padding: '10px 24px', fontSize: 13, cursor: 'pointer', fontWeight: 500 }}>
+              前往 Memory 连接
+            </button>
           </div>
         )}
 
-        {/* Brain 区块 — 漫游 / 反省 / 梦境 */}
-        <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Brain 区块 — 漫游 / 反省 / 梦境（仅 Brain 已连接时显示） */}
+        {hasCookie && <div style={{ padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {brainSections.map(s => (
             <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: openSection[s.id] ? '1px solid rgba(167,139,250,0.3)' : '1px solid rgba(255,255,255,0.04)', overflow: 'hidden', transition: 'all 0.3s' }}>
               <div onClick={() => toggleSection(s.id)} style={{ padding: '14px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -1126,7 +1160,7 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName
               )}
             </div>
           ))}
-        </div>
+        </div>}
       </div>
     </div>
   )
