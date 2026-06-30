@@ -15,7 +15,16 @@ const PORT = parseInt(process.env.WEB_PORT, 10) || parseInt(process.env.PORT, 10
 
 // ============ 静态文件 — 生产环境 serve 前端 ============
 const clientDist = join(__dirname, '..', 'client', 'dist')
-app.use(express.static(clientDist))
+app.use(express.static(clientDist, {
+  setHeaders(res, filePath) {
+    // index.html 不缓存，确保每次都拿最新版本
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
+    }
+  }
+}))
 
 // ============ Ombre Brain 代理 ============
 const ombreProxy = async (path, options = {}) => {
@@ -487,6 +496,9 @@ app.post('/api/tools/call', async (req, res) => {
 
 // ============ SPA 回退 — 所有非 API 路由返回 index.html ============
 app.get('*', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
   res.sendFile(join(clientDist, 'index.html'))
 })
 
