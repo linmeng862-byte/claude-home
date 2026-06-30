@@ -333,39 +333,117 @@ app.post('/api/read-comment', async (req, res) => {
 })
 
 
+// ============ Experience Layer ============
+// 页面不直接写 Brain。事件先变成 Experience，由 Layer 决定是否进入 Brain。
+// Brain 的职责不是记录事件，Brain 的职责是理解经历。
+
+const experienceBuffer = [] // in-memory buffer，轻量暂存
+let lastDreamTrigger = 0   // 上次触发 dream 的时间
+const DREAM_COOLDOWN = 30 * 60 * 1000  // 30 分钟冷却
+
+// Experience 分类 + 裁决规则
+const processExperience = async (exp) => {
+  const { type, content, source, cookie } = exp
+
+  // ── 裁决：这件事值得 Brain 知道吗？──
+  const decisions = {
+    // Chat 对话摘要：累积 3 轮后才值得，importance 由对话深度决定
+    chat: () => {
+      if (!content || content.length < 40) return { action: 'ignore' }
+      return { action: 'bucket', importance: 4, tags: 'chat,对话' }
+    },
+    // Music：快速切歌忽略，真正在听才记录
+    music: () => {
+      // 去重：同一首歌 5 分钟内不重复写入
+      const recent = experienceBuffer.filter(e => e.type === 'music' && e.content === content)
+      if (recent.length > 0 && Date.now() - recent[recent.length - 1].timestamp < 5 * 60 * 1000) {
+        return { action: 'ignore' }
+      }
+      return { action: 'bucket', importance: 3, tags: 'music,音乐' }
+    },
+    // Echo 发布：这是关系痕迹，值得记录
+    echo: () => ({ action: 'bucket', importance: 6, tags: 'echo,回响' }),
+    // Echo 评论：互动有意义
+    echo_comment: () => ({ action: 'bucket', importance: 5, tags: 'echo,评论,互动' }),
+    // Diary：AI 帮写的日记，值得 Brain 知道
+    diary: () => ({ action: 'bucket', importance: 6, tags: 'diary,日记' }),
+    // save_memory 是 AI 主动保存，直接进 Brain（不走这里，在 tool call 里处理）
+  }
+
+  const decide = decisions[type]
+  if (!decide) return { action: 'ignore' }
+  const decision = decide()
+
+  // 加入 buffer（供去重和未来批量处理用）
+  experienceBuffer.push({ ...exp, decision, timestamp: Date.now() })
+  // buffer 最多保留 200 条
+  if (experienceBuffer.length > 200) experienceBuffer.splice(0, experienceBuffer.length - 200)
+
+  // 执行裁决
+  if (decision.action === 'bucket' && cookie) {
+    try {
+      await fetch(`${OMBRE_BRAIN}/api/buckets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({
+          content: `[${type}] ${content}`,
+          tags: decision.tags,
+          importance: decision.importance,
+        }),
+      })
+    } catch {}
+
+    // 高 importance 事件触发 dream（有冷却期）
+    if (decision.importance >= 6 && Date.now() - lastDreamTrigger > DREAM_COOLDOWN) {
+      lastDreamTrigger = Date.now()
+      fetch(`${OMBRE_BRAIN}/dream-hook`).catch(() => {})
+    }
+  }
+
+  return decision
+}
+
+app.post('/api/experience', async (req, res) => {
+  const { type, content, source } = req.body
+  const cookie = req.headers['x-ombre-cookie'] || ''
+  if (!type || !content) return res.json({ received: false })
+
+  const decision = await processExperience({ type, content, source, cookie })
+  res.json({ received: true, ...decision })
+})
+
+
 // ============ AI Tool 执行 ============
 app.post('/api/tools/call', async (req, res) => {
   const { tool, args, cookie } = req.body
   try {
-    // 写入 Brain 的辅助函数 — 让所有 tool 产出都进入 Brain
-    const writeToBrain = async (content, tags = '') => {
-      if (!cookie) return null
-      try {
-        const r = await fetch(`${OMBRE_BRAIN}/api/buckets`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
-          body: JSON.stringify({ content, tags, importance: 6 }),
-        })
-        return await r.json()
-      } catch { return null }
-    }
-
     switch (tool) {
       case 'get_current_time': {
         const now = new Date()
         return res.json({ result: `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}` })
       }
       case 'save_memory': {
-        const data = await writeToBrain(args.content, args.tags || '')
-        return res.json({ result: '记忆已保存', data })
+        // AI 主动保存 — 直接进 Brain（这是 AI 的明确判断，不是隐式事件）
+        if (cookie) {
+          try {
+            const r = await fetch(`${OMBRE_BRAIN}/api/buckets`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+              body: JSON.stringify({ content: args.content, tags: args.tags || '', importance: args.importance || 5 }),
+            })
+            const data = await r.json()
+            return res.json({ result: '记忆已保存', data })
+          } catch { return res.json({ result: '记忆保存失败' }) }
+        }
+        return res.json({ result: '未连接 Brain' })
       }
       case 'post_echo': {
-        // Echo 写入 Brain — Brain 可以在 dream/reflection 中消化这段回响
-        await writeToBrain(`[Echo] ${args.content}`, 'echo,回响')
+        // Echo 作为 Experience 提交 — Layer 决定是否写入 Brain
+        if (cookie) fetch('http://localhost:3001/api/experience', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie }, body: JSON.stringify({ type: 'echo', content: args.content, source: 'tool_call' }) }).catch(() => {})
         return res.json({ result: 'ok', content: args.content, type: 'echo' })
       }
       case 'write_diary': {
-        // Diary 写入 Brain — 让 Brain 知道发生了什么
-        await writeToBrain(`[Diary] ${args.title}: ${args.content}`, 'diary,日记')
+        // Diary 作为 Experience 提交
+        if (cookie) fetch('http://localhost:3001/api/experience', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie }, body: JSON.stringify({ type: 'diary', content: `${args.title}: ${args.content}`, source: 'tool_call' }) }).catch(() => {})
         return res.json({ result: 'ok', title: args.title, content: args.content, type: 'diary' })
       }
       default:

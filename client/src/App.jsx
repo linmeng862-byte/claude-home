@@ -526,7 +526,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
         (tk)=>{acc+=tk;setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))},
         (th)=>{tacc+=th;setMessages(p=>p.map(m=>m.id===aid?{...m,thinking:tacc}:m))},
         (tn,ta)=>{const cfg=config||{};const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';fetch('/api/tools/call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tn,args:ta,cookie:ombreCookie})}).then(r=>r.json()).then(d=>{if(d.type==='echo'&&d.content){window.dispatchEvent(new CustomEvent('ai-echo',{detail:{content:d.content,aiName:cfg.aiName||'Claude',aiAvatar}}));acc+='\n🌊 已发布回响: "'+d.content.slice(0,30)+'..."';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}if(d.type==='diary'&&d.title){window.dispatchEvent(new CustomEvent('ai-diary',{detail:{title:d.title,content:d.content,aiName:cfg.aiName||'Claude'}}));acc+='\n📝 已写日记: "'+d.title+'"';setMessages(p=>p.map(m=>m.id===aid?{...m,content:acc}:m))}}).catch(()=>{})},
-        (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);fetch('/api/memory/dream').catch(()=>{});const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';if(ombreCookie&&fc){const userMsg=messages[messages.length-1]?.content||'';fetch('/api/memory/buckets',{method:'POST',headers:{'Content-Type':'application/json','x-ombre-cookie':ombreCookie},body:JSON.stringify({content:`[Chat] 用户: ${userMsg.slice(0,200)} | AI: ${fc.slice(0,200)}`,tags:'chat,对话',importance:4})}).catch(()=>{})}}
+        (fc,ft)=>{setMessages(p=>p.map(m=>m.id===aid?{...m,content:fc,thinking:ft||null}:m));setIsTyping(false);const ombreCookie=localStorage.getItem('bh_ombre_cookie')||'';if(ombreCookie&&fc){const userMsg=messages[messages.length-1]?.content||'';fetch('/api/experience',{method:'POST',headers:{'Content-Type':'application/json','x-ombre-cookie':ombreCookie},body:JSON.stringify({type:'chat',content:`用户: ${userMsg.slice(0,200)} | AI: ${fc.slice(0,200)}`,source:'chat'})}).catch(()=>{})}}
       )
     } catch(e){setMessages(p=>[...p,{id:Date.now()+1,role:'assistant',content:'调用失败: '+e.message,thinking:null,created_at:new Date().toISOString()}]);setIsTyping(false)}
   }
@@ -698,12 +698,12 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
       ...prev,
       [postId]: [...(prev[postId] || []), { name: userName || '你', text: commentText.trim() }]
     }))
-    // 互动写入 Brain — 让 Brain 记住这段关系痕迹
+    // 互动变为 Experience — Layer 决定是否进入 Brain
     const cookie = localStorage.getItem('bh_ombre_cookie') || ''
     if (cookie) {
-      fetch('/api/memory/buckets', {
+      fetch('/api/experience', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie },
-        body: JSON.stringify({ content: `[Echo 评论] 对"${postContent?.slice(0, 50)}"回应: ${commentText.trim()}`, tags: 'echo,回响,评论', importance: 4 })
+        body: JSON.stringify({ type: 'echo_comment', content: `对"${postContent?.slice(0, 50)}"回应: ${commentText.trim()}`, source: 'echo' })
       }).catch(() => {})
     }
     setCommentText('')
@@ -1328,14 +1328,14 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
     if (songCover) extractThemeColor(songCover)
   }, [songCover])
 
-  // 歌曲信息写入 Brain — 让 Brain 知道我们在听什么
+  // 歌曲信息变为 Experience — Layer 决定是否让 Brain 知道
   useEffect(() => {
     if (!songTitle || !songArtist) return
     const cookie = localStorage.getItem('bh_ombre_cookie') || ''
     if (!cookie) return
-    fetch('/api/memory/buckets', {
+    fetch('/api/experience', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ombre-cookie': cookie },
-      body: JSON.stringify({ content: `[Music] 正在听: ${songTitle} — ${songArtist}`, tags: 'music,音乐', importance: 3 })
+      body: JSON.stringify({ type: 'music', content: `正在听: ${songTitle} — ${songArtist}`, source: 'music' })
     }).catch(() => {})
   }, [songTitle, songArtist])
 
