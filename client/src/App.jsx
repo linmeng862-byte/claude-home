@@ -423,7 +423,7 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
               <span className="ios-app-label" style={{ color: ios.text }}>{app.name}</span>
             </div>
           ))}
-        </div>}
+        </div>
 
         {/* 昼夜 + 颜色 */}
         <div className="ios-home-controls" style={{ borderColor: ios.separator }}>
