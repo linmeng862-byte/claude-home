@@ -208,8 +208,11 @@ function DualAvatars({ size = 40, accent, userAvatar, aiAvatar }) {
 /* ============================================================
    开屏页 — iOS Home Screen 风格 (参考 8.png)
    ============================================================ */
-function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setThemeColor, userAvatar, aiAvatar, homeBg, setHomeBg, widgetImg1, setWidgetImg1, widgetImg2, setWidgetImg2, songCover, setSongCover }) {
-  // 音乐封面播放状态
+function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setThemeColor, userAvatar, aiAvatar, homeBg, setHomeBg }) {
+  // 图片组件 — 直接从 localStorage 读写，确保持久化
+  const [widgetImg1, setWidgetImg1] = useState(() => localStorage.getItem('bh_widgetImg1') || null)
+  const [widgetImg2, setWidgetImg2] = useState(() => localStorage.getItem('bh_widgetImg2') || null)
+  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_songCover') || null)
   const [playing, setPlaying] = useState(false)
   const widget1Ref = useRef(null)
   const widget2Ref = useRef(null)
@@ -226,24 +229,60 @@ function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setT
     return () => clearInterval(id)
   }, [])
 
-  const handleWidgetUpload = (which, e) => {
+  // 压缩图片 — 限制最大 800px + 质量 0.7，避免 localStorage 溢出
+  const compressImage = (dataUrl, maxPx = 800, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let w = img.width, h = img.height
+        if (w > maxPx || h > maxPx) {
+          const ratio = Math.min(maxPx / w, maxPx / h)
+          w = Math.round(w * ratio); h = Math.round(h * ratio)
+        }
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = () => resolve(dataUrl) // 压缩失败就用原图
+      img.src = dataUrl
+    })
+  }
+
+  const saveImg = (key, value) => {
+    if (value) { try { localStorage.setItem(key, value) } catch(e) { console.warn('localStorage 写入失败（可能超出容量）:', e) } }
+    else { localStorage.removeItem(key) }
+  }
+
+  const handleWidgetUpload = async (which, e) => {
     const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => { if (which === 1) setWidgetImg1(ev.target.result); else setWidgetImg2(ev.target.result) }
+    reader.onload = async (ev) => {
+      const compressed = await compressImage(ev.target.result)
+      if (which === 1) { setWidgetImg1(compressed); saveImg('bh_widgetImg1', compressed) }
+      else { setWidgetImg2(compressed); saveImg('bh_widgetImg2', compressed) }
+    }
     reader.readAsDataURL(file)
   }
 
-  const handleSongCover = (e) => {
+  const handleSongCover = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => setSongCover(ev.target.result)
+    reader.onload = async (ev) => {
+      const compressed = await compressImage(ev.target.result)
+      setSongCover(compressed); saveImg('bh_songCover', compressed)
+    }
     reader.readAsDataURL(file)
   }
 
-  const handleHomeBg = (e) => {
+  const handleHomeBg = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => setHomeBg(ev.target.result)
+    reader.onload = async (ev) => {
+      const compressed = await compressImage(ev.target.result, 1200, 0.8)
+      setHomeBg(compressed)
+    }
     reader.readAsDataURL(file)
   }
 
@@ -501,16 +540,6 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
   const aiName = config?.aiName || 'Claude'
   const dark = darkMode
 
-  // 预设背景
-  const presetBgs = [
-    { name: '默认', value: null },
-    { name: '星空', value: 'linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%)' },
-    { name: '日落', value: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #f0932b 100%)' },
-    { name: '森林', value: 'linear-gradient(135deg, #0d3b0d 0%, #1b5e20 50%, #2e7d32 100%)' },
-    { name: '薰衣草', value: 'linear-gradient(135deg, #3c1361 0%, #52307c 50%, #7b2d8e 100%)' },
-    { name: '海洋', value: 'linear-gradient(135deg, #003366 0%, #006994 50%, #0099cc 100%)' },
-  ]
-
   return (
     <div className={"ch-chat "+(dark?'dark':'')} style={{background: chatBg ? `url(${chatBg}) center/cover fixed` : (dark?'#000':(themeColor||'#F8F8FF')),color:dark?'#e5e5ea':'#1c1c1e'}}>
 
@@ -579,7 +608,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
         {isTyping&&<button onClick={handleStop} style={{position:'absolute',bottom:36,right:16,background:'#2D8CFF',color:'#fff',border:'none',borderRadius:16,padding:'5px 12px',fontSize:12,fontWeight:500,cursor:'pointer',boxShadow:'0 2px 8px rgba(45,140,255,0.3)'}}>停止生成</button>}
       </div>
 
-      {/* 背景选择弹窗 */}
+      {/* 背景选择弹窗 — 只保留图片上传 */}
       {showBgPicker && (
         <div className="ch-sheet-overlay" onClick={() => setShowBgPicker(false)}>
           <div className="ch-sheet" onClick={e => e.stopPropagation()} style={{background:dark?'#1c1c1e':'#fff'}}>
@@ -589,22 +618,17 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
               <button className="ch-sheet-close" onClick={() => setShowBgPicker(false)} style={{color:dark?'rgba(255,255,255,0.3)':'rgba(60,60,67,0.3)'}}>✕</button>
             </div>
             <div className="ch-sheet-body" style={{padding:'12px 16px'}}>
-              {/* 预设背景 */}
-              <div style={{fontSize:12,color:dark?'#8e8e93':'#6e6e73',marginBottom:8}}>预设背景</div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
-                {presetBgs.map(bg => (
-                  <div key={bg.name} onClick={() => { if(bg.value===null){clearChatBg()} else {setChatBg(bg.value); localStorage.setItem('bh_chatBg',bg.value)} setShowBgPicker(false) }}
-                    style={{aspectRatio:'1',borderRadius:8,background:bg.value||'transparent',border:chatBg===bg.value?`2px solid #2D8CFF`:'1px solid rgba(255,255,255,0.1)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:bg.value?'#fff':(dark?'#8e8e93':'#6e6e73')}}>
-                    {bg.name}
-                  </div>
-                ))}
-              </div>
-              {/* 自定义上传 */}
-              <div style={{fontSize:12,color:dark?'#8e8e93':'#6e6e73',marginBottom:8}}>自定义图片</div>
-              <div style={{display:'flex',gap:8}}>
-                <button onClick={() => chatBgRef.current?.click()} style={{flex:1,padding:'8px 0',background:dark?'#2c2c2e':'#f2f2f7',border:'none',borderRadius:8,color:dark?'#e5e5ea':'#1c1c1e',fontSize:13,cursor:'pointer'}}>📁 选择图片</button>
-                {chatBg && <button onClick={clearChatBg} style={{padding:'8px 12px',background:'rgba(255,59,48,0.1)',border:'none',borderRadius:8,color:'#ff3b30',fontSize:13,cursor:'pointer'}}>重置</button>}
-              </div>
+              {chatBg && <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:8}}>
+                <div style={{width:48,height:64,borderRadius:6,overflow:'hidden',flexShrink:0,background:`url(${chatBg}) center/cover`}} />
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:dark?'#e5e5ea':'#1c1c1e',fontWeight:500}}>当前背景</div>
+                  <div style={{fontSize:10,color:dark?'#8e8e93':'#6e6e73'}}>点击重置恢复默认</div>
+                </div>
+                <button onClick={() => { clearChatBg(); setShowBgPicker(false) }} style={{background:'rgba(255,59,48,0.1)',border:'none',borderRadius:6,padding:'6px 12px',color:'#ff3b30',fontSize:12,cursor:'pointer'}}>重置</button>
+              </div>}
+              <button onClick={() => chatBgRef.current?.click()} style={{width:'100%',padding:'10px 0',background:dark?'#2c2c2e':'#f2f2f7',border:'none',borderRadius:8,color:dark?'#e5e5ea':'#1c1c1e',fontSize:13,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                <ImageIcon size={16} /> 选择图片
+              </button>
               <input ref={chatBgRef} type="file" accept="image/*" hidden onChange={e => { handleChatBgUpload(e); setShowBgPicker(false) }} />
             </div>
           </div>
@@ -1351,14 +1375,24 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 网易云音乐搜索（通过后端代理）
   const handleNeteaseSearch = async () => {
     if (!searchQ.trim()) return
+    setSearchResults([])
     try {
       const r = await fetch(`/api/music/search?q=${encodeURIComponent(searchQ)}&limit=10`)
+      if (!r.ok) throw new Error(`请求失败 ${r.status}`)
       const d = await r.json()
-      setSearchResults((d.result?.songs || []).map(s => ({
-        id: s.id, title: s.name, artist: s.artist, cover: s.cover,
-        album: s.album, source: 'netease'
-      })))
-    } catch { setSearchResults([]) }
+      const songs = d.result?.songs || []
+      if (songs.length === 0) {
+        setSearchResults([{ id: '__empty', title: '未找到结果，试试其他关键词', artist: '', source: 'netease' }])
+      } else {
+        setSearchResults(songs.map(s => ({
+          id: s.id, title: s.name, artist: s.artist, cover: s.cover,
+          album: s.album, source: 'netease'
+        })))
+      }
+    } catch (e) {
+      console.error('网易云搜索失败:', e)
+      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'netease' }])
+    }
   }
 
   // iTunes Search API
@@ -1538,11 +1572,11 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {searchResults.map((r, i) => (
-                <div key={i} onClick={() => selectSong(r)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderRadius: 8, cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                <div key={i} onClick={() => { if (!r.id?.startsWith('__')) selectSong(r) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', borderRadius: 8, cursor: r.id?.startsWith('__') ? 'default' : 'pointer', transition: 'background 0.2s', opacity: r.id?.startsWith('__') ? 0.5 : 1 }}
+                  onMouseEnter={e => { if (!r.id?.startsWith('__')) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  {r.cover ? <img src={r.cover} alt="" style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Music size={14} style={{ color: 'rgba(255,255,255,0.4)' }} /></div>}
+                  {r.cover && !r.id?.startsWith('__') ? <img src={r.cover} alt="" style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover' }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Music size={14} style={{ color: 'rgba(255,255,255,0.4)' }} /></div>}
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#f0eff5' }}>{r.title}</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{r.artist}{r.album ? ` · ${r.album}` : ''}</div>
@@ -2270,9 +2304,6 @@ function App() {
   const [userAvatar, setUserAvatar] = useState(() => localStorage.getItem('bh_userAvatar'))
   const [aiAvatar, setAiAvatar] = useState(() => localStorage.getItem('bh_aiAvatar'))
   const [homeBg, setHomeBg] = useState(() => localStorage.getItem('bh_homeBg') || null)
-  const [widgetImg1, setWidgetImg1] = useState(() => localStorage.getItem('bh_widgetImg1') || null)
-  const [widgetImg2, setWidgetImg2] = useState(() => localStorage.getItem('bh_widgetImg2') || null)
-  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_songCover') || null)
 
   // 全局配置 — 从 localStorage 读取
   const [config, setConfig] = useState(() => {
@@ -2292,10 +2323,6 @@ function App() {
 
   const updateUserAvatar = (v) => { setUserAvatar(v); if (v) localStorage.setItem('bh_userAvatar', v); else localStorage.removeItem('bh_userAvatar') }
   const updateAiAvatar = (v) => { setAiAvatar(v); if (v) localStorage.setItem('bh_aiAvatar', v); else localStorage.removeItem('bh_aiAvatar') }
-  const updateHomeBg = (v) => { setHomeBg(v); if (v) localStorage.setItem('bh_homeBg', v); else localStorage.removeItem('bh_homeBg') }
-  const updateWidgetImg1 = (v) => { setWidgetImg1(v); if (v) localStorage.setItem('bh_widgetImg1', v); else localStorage.removeItem('bh_widgetImg1') }
-  const updateWidgetImg2 = (v) => { setWidgetImg2(v); if (v) localStorage.setItem('bh_widgetImg2', v); else localStorage.removeItem('bh_widgetImg2') }
-  const updateSongCover = (v) => { setSongCover(v); if (v) localStorage.setItem('bh_songCover', v); else localStorage.removeItem('bh_songCover') }
 
   return (
     <>
@@ -2304,10 +2331,7 @@ function App() {
           themeColor={themeColor} setThemeColor={setThemeColor}
           onModuleSelect={mod => setCurrentPage(mod)}
           userAvatar={userAvatar} aiAvatar={aiAvatar}
-          homeBg={homeBg} setHomeBg={updateHomeBg}
-          widgetImg1={widgetImg1} setWidgetImg1={updateWidgetImg1}
-          widgetImg2={widgetImg2} setWidgetImg2={updateWidgetImg2}
-          songCover={songCover} setSongCover={updateSongCover} />
+          homeBg={homeBg} setHomeBg={(v) => { setHomeBg(v); if (v) localStorage.setItem('bh_homeBg', v); else localStorage.removeItem('bh_homeBg') }} />
       )}
       {currentPage === 'chat' && (
         <ChatPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} themeColor={themeColor} userAvatar={userAvatar} aiAvatar={aiAvatar} config={config} aiName={config?.aiName} userName={config?.userName} />
