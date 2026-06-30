@@ -1896,44 +1896,21 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
     </div>
   )
 
-  const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => {
-    const composingRef = useRef(false)
-    const inputRef = useRef(null)
-    // 使用 ref 跟踪最新 value，避免闭包陷阱
-    const valueRef = useRef(value)
-    valueRef.current = value
-
-    const handleInput = useCallback((e) => {
-      if (composingRef.current) {
-        // IME 组字中：仍然更新 state，否则移动端输入框会空白
-        onChange(e.target.value)
-      } else {
-        onChange(e.target.value)
-      }
-    }, [onChange])
-
-    const handleCompositionEnd = useCallback((e) => {
-      composingRef.current = false
-      // PC 端：flush 最终汉字值
-      onChange(e.target.value)
-    }, [onChange])
-
-    return (
-      <div style={{ marginBottom: rows ? 12 : 8 }}>
-        <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
-        {rows ? (
-          <textarea value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder} rows={rows}
-            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
-        ) : type === 'password' ? (
-          <input type="password" value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder}
-            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-        ) : (
-          <input type="text" value={value} onChange={handleInput} onCompositionStart={() => { composingRef.current = true }} onCompositionEnd={handleCompositionEnd} placeholder={placeholder}
-            style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-        )}
-      </div>
-    )
-  }
+  const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => (
+    <div style={{ marginBottom: rows ? 12 : 8 }}>
+      <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
+      {rows ? (
+        <textarea value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
+          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
+      ) : type === 'password' ? (
+        <input type="password" value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder}
+          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+      ) : (
+        <input type="text" value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder}
+          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+      )}
+    </div>
+  )
 
   const Segmented = ({ options, value, onChange }) => (
     <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
