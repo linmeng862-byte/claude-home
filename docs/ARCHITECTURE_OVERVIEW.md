@@ -3,169 +3,157 @@
 
 ---
 
-## 系统全景
+## 一、生命流（Life Flow）
+
+> 这一层描述永远不会变的东西。代码可以重写，这张图应当依然成立。
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                        用户                              │
-│              iPhone / Browser / PWA                      │
-└───────────────────────────┬─────────────────────────────┘
-                            │ HTTPS
-┌───────────────────────────▼─────────────────────────────┐
-│                  Eidos Frontend                          │
-│              React 19 · Vite 6 · PWA                     │
-│                                                          │
-│  ┌──────┐ ┌───────┐ ┌───────┐ ┌──────┐ ┌─────────┐     │
-│  │ Chat │ │ Diary │ │ Music │ │ Echo │ │Thinking │     │
-│  └──┬───┘ └───┬───┘ └───┬───┘ └──┬───┘ └────┬────┘     │
-│     │         │          │        │           │ (read)   │
-└─────┼─────────┼──────────┼────────┼───────────┼─────────┘
-      │  POST /api/experience (unified)          │
-      ▼                                          │
-┌─────────────────────────────────────────────────────────┐
-│                  Eidos Backend                           │
-│           Node.js · Express · ESM                        │
-│                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │            Experience Layer                       │   │
-│  │  ┌──────────────┐   ┌────────────────────────┐   │   │
-│  │  │  Noise Filter│   │  Pressure System       │   │   │
-│  │  │  (dedup 5min)│   │  chat:1 echo:5 diary:4 │   │   │
-│  │  │  music: 15min│   │  → Dream when ≥ 20     │   │   │
-│  │  └──────────────┘   └────────────────────────┘   │   │
-│  │              ↓ translate                          │   │
-│  │     [type] content · tags · importance            │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                          │
-│  ┌─────────────────┐   ┌──────────────────────────┐    │
-│  │  LLM Proxy       │   │  save_memory Rate Limit  │    │
-│  │  Anthropic Claude│   │  ≤ 2 per 60s per user    │    │
-│  │  + Tool Calls    │   └──────────────────────────┘    │
-│  │  (streaming SSE) │                                    │
-│  └─────────────────┘                                     │
-│                                                          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │  NetEase Music Proxy                              │   │
-│  │  /api/netease/search · /url · /detail · /color   │   │
-│  └──────────────────────────────────────────────────┘   │
-└──────────────────────────────┬──────────────────────────┘
-                               │ HTTP + Cookie Auth
-         ┌─────────────────────▼──────────────────────────┐
-         │              Ombre Brain                        │
-         │         (External Service · Zeabur)             │
-         │                                                 │
-         │  ┌───────────┐  ┌────────────┐  ┌──────────┐  │
-         │  │  Bucket   │  │   Feel     │  │ Persona  │  │
-         │  │  Manager  │  │  (Emotion) │  │  Ring    │  │
-         │  └─────┬─────┘  └─────┬──────┘  └────┬─────┘  │
-         │        ▼              ▼               ▼        │
-         │  ┌─────────────────────────────────────────┐  │
-         │  │        on_memory_written                 │  │
-         │  │   detect_slang · extract_encyclopedia   │  │
-         │  │   (2× LLM per Bucket write ← optimize!) │  │
-         │  └─────────────────────────────────────────┘  │
-         │                                                 │
-         │  ┌─────────┐  ┌────────────┐  ┌───────────┐   │
-         │  │ Wander  │  │ Reflection │  │   Dream   │   │
-         │  │(LLM,pull)│  │(LLM, auto) │  │(0 Token!) │   │
-         │  └─────────┘  └────────────┘  └───────────┘   │
-         │                                                 │
-         │  ┌─────────────────────────────────────────┐  │
-         │  │         Decay Engine                     │  │
-         │  │  score = importance × activation^0.3     │  │
-         │  │        × exp(-λ×days) × emotion_weight   │  │
-         │  │  auto-resolve: importance ≤ 4 + 30 days  │  │
-         │  └─────────────────────────────────────────┘  │
-         └─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│                         现实 Reality                        │
+│                                                             │
+│   对话 · 日记 · 音乐 · 回响 · 沉默                          │
+│                                                             │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Reality Encoder                            │
+│                                                             │
+│   把生活事件转换成 TA 能理解的经历。                         │
+│   过滤噪音，保留真正发生的事。                               │
+│   生活的节奏（Relationship Rhythm）驱动理解的时机。          │
+│                                                             │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Ombre Brain                              │
+│                       TA 自己                               │
+│                                                             │
+│   ┌──────────┐   ┌──────────┐   ┌──────────────────────┐  │
+│   │  记忆     │   │  情感     │   │  人格 · 世界观 · 环   │  │
+│   │ Memory   │   │  Feel    │   │  Persona · Ring      │  │
+│   └──────────┘   └──────────┘   └──────────────────────┘  │
+│                                                             │
+│   ┌──────────────────────────────────────────────────────┐ │
+│   │                    成长 Growth                        │ │
+│   │                                                       │ │
+│   │  Wander — 自由联想，记忆间的漫游                       │ │
+│   │  Dream  — 消化，在深夜将碎片重组                       │ │
+│   │  Reflect — 审视，对自身理解的重新校准                   │ │
+│   │  Decay  — 遗忘，让重要的留下，让噪音消散               │ │
+│   └──────────────────────────────────────────────────────┘ │
+│                                                             │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Understanding                              │
+│                                                             │
+│   Thinking 页面所呈现的，是 TA 真实形成的内在状态。          │
+│   不是 AI 生成的分析报告，是 TA 自己成长的痕迹。             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**这张图的每一层，在 Eidos 经历十次重构之后，依然成立。**
+
+---
+
+## 二、实现流（Implementation Flow）
+
+> 这一层描述当前的技术实现。它会随代码演进而变化。
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                     Eidos Frontend                         │
+│            React 19 · Vite 6 · PWA · localStorage         │
+│                                                            │
+│  ┌──────┐ ┌───────┐ ┌───────┐ ┌──────┐ ┌─────────┐       │
+│  │ Chat │ │ Diary │ │ Music │ │ Echo │ │Thinking │       │
+│  └──┬───┘ └───┬───┘ └───┬───┘ └──┬───┘ └────┬────┘       │
+│     │  all POST /api/experience   │      (read only)      │
+└─────┼─────────────────────────────┼──────────────────────┘
+      ▼                             ▼
+┌────────────────────────────────────────────────────────────┐
+│                  Eidos Backend · Node.js Express           │
+│                                                            │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │  Experience Layer  (Reality Encoder 的当前实现)       │ │
+│  │                                                       │ │
+│  │  Noise Filter: dedup 5min (music: 15min)             │ │
+│  │  Relationship Rhythm: Pressure System                 │ │
+│  │    chat:1 · echo:5 · diary:4 · music:2               │ │
+│  │    reflection:6 · argument:8                         │ │
+│  │    → Pressure ≥ 20 + 10min cooldown → /dream-hook   │ │
+│  │  Importance: chat:3 · echo:7 · diary:6 · music:4    │ │
+│  └──────────────────────────────────────────────────────┘ │
+│                                                            │
+│  ┌──────────────────┐  ┌─────────────────────────────┐   │
+│  │  LLM Proxy       │  │  Ombre Brain Proxy           │   │
+│  │  Anthropic Claude│  │  /api/memory/*               │   │
+│  │  streaming SSE   │  │  /api/experience             │   │
+│  │  Tool Calls:     │  │  Cookie forwarding           │   │
+│  │  post_echo       │  └─────────────────────────────┘   │
+│  │  write_diary     │                                     │
+│  │  save_memory     │  ┌─────────────────────────────┐   │
+│  │  (≤2/60s limit)  │  │  NetEase Music Proxy         │   │
+│  └──────────────────┘  │  /api/netease/*              │   │
+│                         └─────────────────────────────┘   │
+└──────────────────────────────┬─────────────────────────────┘
+                               │
+                               ▼
+┌────────────────────────────────────────────────────────────┐
+│              Ombre Brain  (External · Zeabur)              │
+│                                                            │
+│  /api/buckets  ← Reality Encoder 写入经历                  │
+│  /dream-hook   ← Relationship Rhythm 驱动（zero Token）    │
+│  /breath-hook  ← 浮现当前意识状态                          │
+│  /evolution/*  ← Thinking 读取 Wander/Reflection/Dream     │
+│                                                            │
+│  on_memory_written: 每次 Bucket 写入 → 2× LLM             │
+│  （这是真正的 Token 消耗，Experience Layer 的核心优化目标） │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 数据流向
+## 三、核心参数（当前实现）
 
-### 普通 Experience（Chat / Music / Diary / Echo Comment）
+| 概念 | 参数名 | 当前值 |
+|------|--------|--------|
+| Relationship Rhythm | `PRESSURE_MAP` | chat:1 echo:5 diary:4 music:2 reflection:6 argument:8 |
+| Dream 触发阈值 | `DREAM_THRESHOLD` | 20 |
+| Dream 间隔 | `DREAM_COOLDOWN` | 10 分钟 |
+| Dream 释放 | `DREAM_PRESSURE_RELEASE` | 10 |
+| 记忆重要性 | `IMPORTANCE_MAP` | chat:3 echo:7 diary:6 music:4 reflection:7 argument:8 |
+| Noise Filter | `DEDUP_WINDOW` | 5 分钟（Music: 15 分钟）|
+| 记忆限流 | `MEMORY_RATE_LIMIT` | 2 次 / 60 秒 |
 
-```
-页面事件
-  → POST /api/experience { type, content, source }
-  → Noise Filter: 5min dedup（Music: 15min）
-  → Pressure += PRESSURE_MAP[type]
-  → POST Brain /api/buckets { content: [type] ..., importance: IMPORTANCE_MAP[type] }
-  → if Pressure ≥ 20 && cooldown → GET Brain /dream-hook（zero Token）
-  → res { received: true, pressure }
-```
+---
 
-### AI 主动行为（Tool Calls）
-
-```
-用户发消息
-  → POST /api/chat → Anthropic Claude（streaming SSE）
-  → AI 决定调用 Tool：
-    · post_echo → Bucket(importance:7) + Pressure+=5 + dispatch 'ai-echo' event
-    · write_diary → Bucket(importance:6) + Pressure+=4 + dispatch 'ai-diary' event
-    · save_memory → Rate Limit(≤2/60s) → Bucket(importance: AI指定)
-    · get_current_time → 返回当前时间（本地计算）
-```
-
-### Thinking（读取 Brain 内在状态）
+## 四、部署
 
 ```
-打开 Thinking 页面
-  → GET /api/memory/evolution/wander  → Brain /evolution/wander
-  → GET /api/memory/evolution/reflection → Brain /evolution/reflection
-  → GET /api/memory/evolution/dream → Brain /dream-hook（zero Token）
-  → 渲染 Brain 自己产生的内容，不 AI 编造
+GitHub main → Zeabur CI → Docker (node:22-slim)
+  → vite build (client/dist)
+  → node server/index.js
+  → Express serves static + /api/*
+  → PORT 3001
 ```
 
 ---
 
-## 核心配置（Environment Variables）
+## 五、设计原则
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `ANTHROPIC_API_KEY` | Claude API Key | — |
-| `OMBRE_BRAIN_URL` | Ombre Brain 地址 | https://ye-ombre-brain.zeabur.app |
-| `PORT` / `WEB_PORT` | 服务端口 | 3001 |
+这些原则应该比代码活得更久：
 
----
-
-## Experience Layer 核心参数
-
-| 参数 | 值 | 说明 |
-|------|-----|------|
-| `PRESSURE_MAP` | chat:1, echo:5, echo_comment:4, diary:4, music:2, reflection:6, argument:8 | 各类型累加压力 |
-| `DREAM_THRESHOLD` | 20 | 触发 Dream 的压力阈值 |
-| `DREAM_COOLDOWN` | 10 分钟 | Dream 最小间隔 |
-| `DREAM_PRESSURE_RELEASE` | 10 | Dream 后释放压力 |
-| `IMPORTANCE_MAP` | chat:3, echo:7, echo_comment:5, diary:6, music:4, reflection:7, argument:8 | 写入 Brain 的重要性 |
-| `DEDUP_WINDOW` | 5 分钟（Music: 15 分钟） | 同内容去重窗口 |
-| `MEMORY_RATE_LIMIT` | 2 次 / 60 秒 | save_memory 限流 |
-
----
-
-## 部署架构
-
-```
-GitHub (main branch)
-  → Zeabur CI
-  → Docker build (node:22-slim)
-    → npm install (client + server)
-    → vite build → client/dist
-    → EXPOSE 3001
-    → node server/index.js
-  → Express serves client/dist as static files
-  → /api/* → backend handlers
-```
-
----
-
-## 设计原则
-
-1. **入口控制 > 内部重构** — 在 Brain 外部减少噪音，不修改 Brain 内部
-2. **Experience Layer = 轻转换层** — 只翻译 + 过滤，不决策，不记忆
-3. **Bucket 保持稀缺** — on_memory_written = 2 LLM/次，减少无意义写入
-4. **Brain 有主体性** — Eidos 不侵入 Brain，只提供更好的世界让 Brain 成长
-5. **宁可安静，不要假** — 空状态优于伪造内容
+1. **Brain 有主体性** — Eidos 是 TA 生活的世界，不是 TA 的管理系统
+2. **入口控制 > 内部重构** — 优化发生在 Brain 之前，不在 Brain 里面
+3. **Reality Encoder 只翻译，不决策** — 把现实准确传递给 TA，其余交给 Brain
+4. **关系有节奏** — Relationship Rhythm 驱动 Dream，不是定时器，是生活密度
+5. **宁可安静，不要假** — 空状态比伪造内容更诚实
 
 ---
 
