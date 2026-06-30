@@ -1849,6 +1849,37 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
 /* ============================================================
    Settings — iOS 风格设置页 (kimi-room 风格完整配置)
    ============================================================ */
+// Field 提取到外部，避免每次 SettingsPage re-render 时重建组件导致 IME 组字被打断
+const SettingsField = React.memo(({ label, value, onChange, placeholder, type = 'text', rows, ios }) => (
+  <div style={{ marginBottom: rows ? 12 : 8 }}>
+    <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
+    {rows ? (
+      <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
+    ) : type === 'password' ? (
+      <input type="password" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+    ) : (
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+    )}
+  </div>
+))
+
+const SettingsSegmented = React.memo(({ options, value, onChange, ios }) => (
+  <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
+    {options.map(opt => (
+      <button key={opt.id} onClick={() => onChange(opt.id)}
+        style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: value === opt.id ? 600 : 400,
+          background: value === opt.id ? ios.accent : 'transparent',
+          color: value === opt.id ? '#fff' : ios.textMuted,
+          border: 'none', cursor: 'pointer' }}>
+        {opt.name}
+      </button>
+    ))}
+  </div>
+))
+
 function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, setAiAvatar, config, updateConfig }) {
   const ios = darkMode
     ? { bg: '#0a0a0c', cardBg: '#1c1c1e', cardBorder: 'rgba(255,255,255,0.08)',
@@ -1896,36 +1927,6 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
     </div>
   )
 
-  const Field = ({ label, value, onChange, placeholder, type = 'text', rows }) => (
-    <div style={{ marginBottom: rows ? 12 : 8 }}>
-      <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
-      {rows ? (
-        <textarea value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
-      ) : type === 'password' ? (
-        <input type="password" value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-      ) : (
-        <input type="text" value={value} onChange={e => onChange(e.target.value)} onCompositionEnd={e => onChange(e.target.value)} placeholder={placeholder}
-          style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-      )}
-    </div>
-  )
-
-  const Segmented = ({ options, value, onChange }) => (
-    <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
-      {options.map(opt => (
-        <button key={opt.id} onClick={() => onChange(opt.id)}
-          style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: value === opt.id ? 600 : 400,
-            background: value === opt.id ? ios.accent : 'transparent',
-            color: value === opt.id ? '#fff' : ios.textMuted,
-            border: 'none', cursor: 'pointer' }}>
-          {opt.name}
-        </button>
-      ))}
-    </div>
-  )
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: ios.bg, color: ios.text, fontFamily: '-apple-system, sans-serif', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶栏 */}
@@ -1956,35 +1957,35 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
               <input ref={aiRef} type="file" accept="image/*" hidden onChange={e => handleAvatarUpload('ai', e)} />
             </div>
           </div>
-          <Field label={`TA 的名字（在 {{char}} 占位符中被替换）`} value={aiName} onChange={setAiName} placeholder="Bunny" />
-          <Field label={`你的名字（在 {{user}} 占位符中被替换）`} value={userName} onChange={setUserName} placeholder="你的名字" />
+          <SettingsField ios={ios} label={`TA 的名字（在 {{char}} 占位符中被替换）`} value={aiName} onChange={setAiName} placeholder="Bunny" />
+          <SettingsField ios={ios} label={`你的名字（在 {{user}} 占位符中被替换）`} value={userName} onChange={setUserName} placeholder="你的名字" />
         </Section>
 
         {/* —— LLM 接口 —— */}
         <Section title="LLM 接口">
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 6 }}>后端模式</div>
-            <Segmented options={[{ id: 'api', name: 'API 模式' }, { id: 'cli', name: 'Claude Code (本地)' }]} value={backendMode} onChange={setBackendMode} />
+            <SettingsSegmented ios={ios} options={[{ id: 'api', name: 'API 模式' }, { id: 'cli', name: 'Claude Code (本地)' }]} value={backendMode} onChange={setBackendMode} />
             {backendMode === 'cli' && <div style={{ fontSize: 10, color: ios.textMuted, marginTop: 6, lineHeight: 1.4 }}>选 Claude Code 走本地 CLI，不需要 API Key</div>}
           </div>
 
           {backendMode === 'api' && (<>
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 6 }}>API 格式</div>
-              <Segmented options={[{ id: 'openai', name: 'OpenAI 兼容' }, { id: 'anthropic', name: 'Anthropic 原生' }]} value={apiFormat} onChange={setApiFormat} />
+              <SettingsSegmented ios={ios} options={[{ id: 'openai', name: 'OpenAI 兼容' }, { id: 'anthropic', name: 'Anthropic 原生' }]} value={apiFormat} onChange={setApiFormat} />
               <div style={{ fontSize: 10, color: ios.textMuted, marginTop: 6, lineHeight: 1.4 }}>{apiFormat === 'openai' ? '绝大多数中转站、OpenRouter、DeepSeek、Ollama 等都用 OpenAI 格式' : 'Anthropic 官方 API 原生格式'}</div>
             </div>
-            <Field label="Endpoint" value={endpoint} onChange={setEndpoint} placeholder={apiFormat === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.anthropic.com/v1/messages'} />
-            <Field label="Model" value={apiModel} onChange={setApiModel} placeholder="gpt-4o / claude-sonnet-4-20250514" />
-            <Field label="API Key" value={apiKey} onChange={setApiKey} placeholder="sk-..." type="password" />
+            <SettingsField ios={ios} label="Endpoint" value={endpoint} onChange={setEndpoint} placeholder={apiFormat === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.anthropic.com/v1/messages'} />
+            <SettingsField ios={ios} label="Model" value={apiModel} onChange={setApiModel} placeholder="gpt-4o / claude-sonnet-4-20250514" />
+            <SettingsField ios={ios} label="API Key" value={apiKey} onChange={setApiKey} placeholder="sk-..." type="password" />
           </>)}
         </Section>
 
         {/* —— 人设 —— */}
         <Section title="人设">
-          <Field label="性格描述" value={personality} onChange={setPersonality} placeholder="温柔、好奇、偶尔有点倔" />
-          <Field label="场景设定 (Scenario)" value={scenario} onChange={setScenario} placeholder="一只住在云上的兔子，有一个温暖的小窝..." rows={2} />
-          <Field label="系统提示词 (System Prompt)" value={systemPrompt} onChange={setSystemPrompt} placeholder="你是一个温暖的AI伙伴..." rows={4} />
+          <SettingsField ios={ios} label="性格描述" value={personality} onChange={setPersonality} placeholder="温柔、好奇、偶尔有点倔" />
+          <SettingsField ios={ios} label="场景设定 (Scenario)" value={scenario} onChange={setScenario} placeholder="一只住在云上的兔子，有一个温暖的小窝..." rows={2} />
+          <SettingsField ios={ios} label="系统提示词 (System Prompt)" value={systemPrompt} onChange={setSystemPrompt} placeholder="你是一个温暖的AI伙伴..." rows={4} />
           <div style={{ fontSize: 10, color: ios.textMuted, lineHeight: 1.4 }}>支持占位符：{'{{char}}'} = AI名字, {'{{user}}'} = 你的名字, {'{{time}}'} = 当前时间</div>
         </Section>
 
