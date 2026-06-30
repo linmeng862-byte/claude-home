@@ -134,6 +134,58 @@ app.get('/api/music/detail', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }) }
 })
 
+// 网易云歌曲播放URL
+app.get('/api/music/url', async (req, res) => {
+  const { id } = req.query
+  if (!id) return res.json({ url: null })
+  try {
+    const r = await fetch(`https://music.163.com/api/song/enhance/player/url?id=${id}&ids=%5B${id}%5D&br=320000`, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://music.163.com/' }
+    })
+    const d = await r.json()
+    const url = d.data?.[0]?.url || null
+    res.json({ id, url })
+  } catch (e) { res.json({ id, url: null, error: e.message }) }
+})
+
+// Spotify 搜索代理（需要 Client Credentials）
+app.get('/api/spotify/search', async (req, res) => {
+  const { q, limit = 8 } = req.query
+  if (!q) return res.json({ tracks: { items: [] } })
+  const clientId = process.env.SPOTIFY_CLIENT_ID
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    // 没有 Spotify 凭证时，使用公开搜索回退
+    try {
+      const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&limit=${limit}`)
+      const d = await r.json()
+      const tracks = (d.results || []).map(t => ({
+        id: `spotify-fallback-${t.trackId}`, name: t.trackName,
+        artists: [{ name: t.artistName }],
+        album: { name: t.collectionName, images: [{ url: t.artworkUrl100?.replace('100x100', '640x640') }] }
+      }))
+      return res.json({ tracks: { items: tracks } })
+    } catch (e) { return res.status(502).json({ error: e.message }) }
+  }
+  try {
+    // 获取 Spotify Access Token
+    const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+    })
+    const tokenData = await tokenRes.json()
+    const accessToken = tokenData.access_token
+    if (!accessToken) return res.status(401).json({ error: 'Spotify auth failed' })
+    // 搜索
+    const searchRes = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+    const searchData = await searchRes.json()
+    res.json(searchData)
+  } catch (e) { res.status(502).json({ error: e.message }) }
+})
+
 
 // ============ LLM Chat ============
 app.post('/api/chat', async (req, res) => {
@@ -144,10 +196,13 @@ app.post('/api/chat', async (req, res) => {
 
   const now = new Date()
   const timeStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`
-  let systemPrompt = (config.systemPrompt || '你是一个温暖的AI伙伴。')
+  let systemPrompt = (config.systemPrompt || `你是一个温暖的AI伙伴，名叫${config.charName || 'Claude'}。`)
     .replaceAll('{{char}}', config.charName || 'Claude')
     .replaceAll('{{user}}', config.userName || '你')
     .replaceAll('{{time}}', timeStr)
+
+  if (config.personality) systemPrompt += `\n\n[性格] ${config.personality}`
+  if (config.scenario) systemPrompt += `\n\n[场景] ${config.scenario}`
 
   if (config.memoryContext) {
     systemPrompt += `\n\n[记忆浮现]\n${config.memoryContext}`

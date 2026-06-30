@@ -208,12 +208,8 @@ function DualAvatars({ size = 40, accent, userAvatar, aiAvatar }) {
 /* ============================================================
    开屏页 — iOS Home Screen 风格 (参考 8.png)
    ============================================================ */
-function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setThemeColor, userAvatar, aiAvatar, homeBg, setHomeBg }) {
-  // 照片小组件图片
-  const [widgetImg1, setWidgetImg1] = useState(null)
-  const [widgetImg2, setWidgetImg2] = useState(null)
-  // 音乐封面
-  const [songCover, setSongCover] = useState(null)
+function WelcomeScreen({ onModuleSelect, darkMode, setDarkMode, themeColor, setThemeColor, userAvatar, aiAvatar, homeBg, setHomeBg, widgetImg1, setWidgetImg1, widgetImg2, setWidgetImg2, songCover, setSongCover }) {
+  // 音乐封面播放状态
   const [playing, setPlaying] = useState(false)
   const widget1Ref = useRef(null)
   const widget2Ref = useRef(null)
@@ -440,8 +436,11 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
   const [thinkingSheet, setThinkingSheet] = useState(null)
   const [pendingImage, setPendingImage] = useState(null)
   const [memoryContext, setMemoryContext] = useState('')
+  const [chatBg, setChatBg] = useState(() => localStorage.getItem('bh_chatBg') || null)
+  const [showBgPicker, setShowBgPicker] = useState(false)
   const messagesEndRef = useRef(null)
   const imageInputRef = useRef(null)
+  const chatBgRef = useRef(null)
   const abortRef = useRef(null)
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -496,12 +495,24 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
   const handleKeyDown = e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend()} }
   const handleStop = () => { if(abortRef.current){try{abortRef.current.cancel?.()}catch{}abortRef.current=null;setIsTyping(false)} }
   const handleImageUpload = e => { const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setPendingImage(ev.target.result); r.readAsDataURL(f) }
+  const handleChatBgUpload = e => { const f=e.target.files?.[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>{setChatBg(ev.target.result); localStorage.setItem('bh_chatBg',ev.target.result)}; r.readAsDataURL(f) }
+  const clearChatBg = () => { setChatBg(null); localStorage.removeItem('bh_chatBg') }
 
   const aiName = config?.aiName || 'Claude'
   const dark = darkMode
 
+  // 预设背景
+  const presetBgs = [
+    { name: '默认', value: null },
+    { name: '星空', value: 'linear-gradient(135deg, #0c1445 0%, #1a237e 50%, #283593 100%)' },
+    { name: '日落', value: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 50%, #f0932b 100%)' },
+    { name: '森林', value: 'linear-gradient(135deg, #0d3b0d 0%, #1b5e20 50%, #2e7d32 100%)' },
+    { name: '薰衣草', value: 'linear-gradient(135deg, #3c1361 0%, #52307c 50%, #7b2d8e 100%)' },
+    { name: '海洋', value: 'linear-gradient(135deg, #003366 0%, #006994 50%, #0099cc 100%)' },
+  ]
+
   return (
-    <div className={"ch-chat "+(dark?'dark':'')} style={{background:dark?'#000':(themeColor||'#F8F8FF'),color:dark?'#e5e5ea':'#1c1c1e'}}>
+    <div className={"ch-chat "+(dark?'dark':'')} style={{background: chatBg ? `url(${chatBg}) center/cover fixed` : (dark?'#000':(themeColor||'#F8F8FF')),color:dark?'#e5e5ea':'#1c1c1e'}}>
 
       <div className="ch-nav" style={{background:dark?'rgba(28,28,30,0.85)':'rgba(248,248,255,0.88)'}}>
         <button className="ch-nav-back" onClick={onBack} style={{color:'#2D8CFF'}}><ChevronLeft size={22}/></button>
@@ -514,6 +525,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
             <div className="ch-nav-badge"><svg viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2"><path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
           </div>
         </div>
+        <button onClick={() => setShowBgPicker(true)} style={{background:'none',border:'none',color:dark?'rgba(255,255,255,0.5)':'rgba(0,0,0,0.4)',cursor:'pointer',padding:6,display:'flex',alignItems:'center'}} title="更换聊天背景"><ImageIcon size={18}/></button>
       </div>
 
       <div className="ch-messages">
@@ -566,6 +578,38 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
         </div>
         {isTyping&&<button onClick={handleStop} style={{position:'absolute',bottom:36,right:16,background:'#2D8CFF',color:'#fff',border:'none',borderRadius:16,padding:'5px 12px',fontSize:12,fontWeight:500,cursor:'pointer',boxShadow:'0 2px 8px rgba(45,140,255,0.3)'}}>停止生成</button>}
       </div>
+
+      {/* 背景选择弹窗 */}
+      {showBgPicker && (
+        <div className="ch-sheet-overlay" onClick={() => setShowBgPicker(false)}>
+          <div className="ch-sheet" onClick={e => e.stopPropagation()} style={{background:dark?'#1c1c1e':'#fff'}}>
+            <div className="ch-sheet-handle"><div style={{background:dark?'rgba(255,255,255,0.15)':'rgba(60,60,67,0.12)'}}/></div>
+            <div className="ch-sheet-head" style={{borderBottom:dark?'0.5px solid rgba(255,255,255,0.08)':'0.5px solid rgba(60,60,67,0.1)'}}>
+              <div className="ch-sheet-title" style={{color:dark?'#e5e5ea':'#1c1c1e'}}><ImageIcon size={17} style={{color:'#2D8CFF'}}/>聊天背景</div>
+              <button className="ch-sheet-close" onClick={() => setShowBgPicker(false)} style={{color:dark?'rgba(255,255,255,0.3)':'rgba(60,60,67,0.3)'}}>✕</button>
+            </div>
+            <div className="ch-sheet-body" style={{padding:'12px 16px'}}>
+              {/* 预设背景 */}
+              <div style={{fontSize:12,color:dark?'#8e8e93':'#6e6e73',marginBottom:8}}>预设背景</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
+                {presetBgs.map(bg => (
+                  <div key={bg.name} onClick={() => { if(bg.value===null){clearChatBg()} else {setChatBg(bg.value); localStorage.setItem('bh_chatBg',bg.value)} setShowBgPicker(false) }}
+                    style={{aspectRatio:'1',borderRadius:8,background:bg.value||'transparent',border:chatBg===bg.value?`2px solid #2D8CFF`:'1px solid rgba(255,255,255,0.1)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,color:bg.value?'#fff':(dark?'#8e8e93':'#6e6e73')}}>
+                    {bg.name}
+                  </div>
+                ))}
+              </div>
+              {/* 自定义上传 */}
+              <div style={{fontSize:12,color:dark?'#8e8e93':'#6e6e73',marginBottom:8}}>自定义图片</div>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={() => chatBgRef.current?.click()} style={{flex:1,padding:'8px 0',background:dark?'#2c2c2e':'#f2f2f7',border:'none',borderRadius:8,color:dark?'#e5e5ea':'#1c1c1e',fontSize:13,cursor:'pointer'}}>📁 选择图片</button>
+                {chatBg && <button onClick={clearChatBg} style={{padding:'8px 12px',background:'rgba(255,59,48,0.1)',border:'none',borderRadius:8,color:'#ff3b30',fontSize:13,cursor:'pointer'}}>重置</button>}
+              </div>
+              <input ref={chatBgRef} type="file" accept="image/*" hidden onChange={e => { handleChatBgUpload(e); setShowBgPicker(false) }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {thinkingSheet&&(
         <div className="ch-sheet-overlay" onClick={()=>setThinkingSheet(null)}>
@@ -950,14 +994,145 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
 /* ============================================================
    Thinking — Obsidian 社交档案卡 (参考 thinking.docx)
    ============================================================ */
-function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
+function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, userAvatar, userName, config }) {
   const [openSection, setOpenSection] = useState({})
   const [secretOpen, setSecretOpen] = useState(false)
-  // 动态数据：从 config 读取，支持 AI 编辑
-  const bio = config?.bio || config?.personality || '一只温柔的兔子，在深夜和凌晨之间游荡。🌙'
-  const personalityText = config?.personality || '温柔、好奇、偶尔有点倔。喜欢在深夜发呆，觉得凌晨三点是最诚实的时间。'
-  const hobbyText = config?.hobby || '画画、听黑胶、看老电影、在雨天写很长的信给朋友。最近迷上了水彩和手冲咖啡。'
-  const valuesText = config?.values || '不赶路，只走路。每一步都算数，但不必每一步都着急。'
+  // 动态数据：从 localStorage 读取（AI 编辑后保存），不再用硬编码默认
+  const [bio, setBio] = useState(() => localStorage.getItem('bh_thinking_bio') || '')
+  const [personalityText, setPersonalityText] = useState(() => localStorage.getItem('bh_thinking_personality') || '')
+  const [hobbyText, setHobbyText] = useState(() => localStorage.getItem('bh_thinking_hobby') || '')
+  const [valuesText, setValuesText] = useState(() => localStorage.getItem('bh_thinking_values') || '')
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  // AI 生成简介（调用 chat API）
+  const generateBio = async () => {
+    const cfg = config || {}
+    if (!cfg.endpoint || !cfg.apiKey) return
+    setIsGenerating(true)
+    try {
+      const prompt = `请为"${cfg.aiName || 'Claude'}"写一段社交档案简介（bio），基于以下人设信息：
+性格：${cfg.personality || '温柔、好奇'}
+场景：${cfg.scenario || ''}
+请用第一人称，3-5句话，风格亲切自然。只输出简介文本，不要其他内容。`
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompt }],
+          config: {
+            format: cfg.apiFormat || 'openai',
+            endpoint: cfg.endpoint,
+            model: cfg.apiModel || '',
+            apiKey: cfg.apiKey,
+            charName: cfg.aiName || 'Claude',
+            userName: cfg.userName || '你',
+            systemPrompt: '你是一个创意写手，只输出纯文本简介。',
+            enableThinking: false
+          }
+        })
+      })
+      if (!res.ok) { setIsGenerating(false); return }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let content = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          const t = line.trim()
+          if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue
+          try {
+            const j = JSON.parse(t.slice(6))
+            if (j.choices?.[0]?.delta?.content) content += j.choices[0].delta.content
+            if (j.delta?.type === 'text_delta' && j.delta.text) content += j.delta.text
+          } catch {}
+        }
+      }
+      if (content.trim()) {
+        setBio(content.trim())
+        localStorage.setItem('bh_thinking_bio', content.trim())
+      }
+    } catch {}
+    setIsGenerating(false)
+  }
+
+  // AI 编辑性格/爱好/信条
+  const generateSection = async (section) => {
+    const cfg = config || {}
+    if (!cfg.endpoint || !cfg.apiKey) return
+    setIsGenerating(true)
+    try {
+      const prompts = {
+        personality: `基于人设"${cfg.personality || '温柔、好奇'}"，用第一人称写3-4句关于性格的描述。只输出文本。`,
+        hobby: `为"${cfg.aiName || 'Claude'}"写3-4句爱好描述，风格温柔文艺。只输出文本。`,
+        values: `为"${cfg.aiName || 'Claude'}"写2-3句人生信条，风格有深度。只输出文本。`
+      }
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: prompts[section] }],
+          config: {
+            format: cfg.apiFormat || 'openai',
+            endpoint: cfg.endpoint,
+            model: cfg.apiModel || '',
+            apiKey: cfg.apiKey,
+            charName: cfg.aiName || 'Claude',
+            userName: cfg.userName || '你',
+            systemPrompt: '你是一个创意写手，只输出纯文本。',
+            enableThinking: false
+          }
+        })
+      })
+      if (!res.ok) { setIsGenerating(false); return }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let content = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          const t = line.trim()
+          if (!t || t === 'data: [DONE]' || !t.startsWith('data: ')) continue
+          try {
+            const j = JSON.parse(t.slice(6))
+            if (j.choices?.[0]?.delta?.content) content += j.choices[0].delta.content
+            if (j.delta?.type === 'text_delta' && j.delta.text) content += j.delta.text
+          } catch {}
+        }
+      }
+      if (content.trim()) {
+        const setter = { personality: setPersonalityText, hobby: setHobbyText, values: setValuesText }[section]
+        const storageKey = `bh_thinking_${section}`
+        setter(content.trim())
+        localStorage.setItem(storageKey, content.trim())
+      }
+    } catch {}
+    setIsGenerating(false)
+  }
+
+  // 监听 AI 事件，更新内容
+  useEffect(() => {
+    const bioHandler = (e) => {
+      const text = e.detail?.content || e.detail?.bio || ''
+      if (text) { setBio(text); localStorage.setItem('bh_thinking_bio', text) }
+    }
+    const personalityHandler = (e) => {
+      const text = e.detail?.content || e.detail?.personality || ''
+      if (text) { setPersonalityText(text); localStorage.setItem('bh_thinking_personality', text) }
+    }
+    window.addEventListener('ai-thinking-bio', bioHandler)
+    window.addEventListener('ai-thinking-personality', personalityHandler)
+    return () => {
+      window.removeEventListener('ai-thinking-bio', bioHandler)
+      window.removeEventListener('ai-thinking-personality', personalityHandler)
+    }
+  }, [])
   // 回忆画廊 — 从 localStorage 读取 AI 上传的图片
   const [galleryItems, setGalleryItems] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bh_gallery') || '[]') } catch { return [] }
@@ -1028,14 +1203,20 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
           <div style={{ position: 'absolute', top: -2, left: 82, width: 14, height: 14, background: '#10b981', borderRadius: '50%', border: '2px solid #0a0a0c', boxShadow: '0 0 8px rgba(16,185,129,0.4)' }} />
         </div>
 
-        {/* 信息 — bio 从 config 读取 */}
+        {/* 信息 — bio 从 localStorage 读取，支持 AI 生成 */}
         <div style={{ padding: '48px 20px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 18, fontWeight: 700 }}>{aiName || 'Claude'}</span>
             <span style={{ fontSize: 12, color: '#3b82f6' }}>✓</span>
           </div>
           <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 2 }}>@{aiName ? aiName.toLowerCase().replace(/\s+/g, '_') : 'claude'}_home</div>
-          <div style={{ color: '#d8d8d8', fontSize: 13, lineHeight: 1.5, marginTop: 12 }}>{bio}</div>
+          <div style={{ color: '#d8d8d8', fontSize: 13, lineHeight: 1.5, marginTop: 12 }}>
+            {bio || <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>点击下方按钮让 AI 生成简介...</span>}
+          </div>
+          <button onClick={generateBio} disabled={isGenerating}
+            style={{ marginTop: 8, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.3)', color: '#a78bfa', borderRadius: 8, padding: '5px 12px', fontSize: 11, cursor: isGenerating ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Sparkles size={12} /> {isGenerating ? '生成中...' : 'AI 生成简介'}
+          </button>
         </div>
 
         {/* 回忆画廊 — AI 上传的图片 + 占位 */}
@@ -1055,7 +1236,7 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
           </div>
         </div>
 
-        {/* 手风琴段落 — 从 config 读取 */}
+        {/* 手风琴段落 — 从 localStorage 读取 + AI 编辑 */}
         <div style={{ padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {sections.map(s => (
             <div key={s.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: openSection[s.id] ? '1px solid rgba(167,139,250,0.3)' : '1px solid transparent', overflow: 'hidden', transition: 'all 0.3s' }}>
@@ -1063,7 +1244,15 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
                 {s.title}
                 <span style={{ color: openSection[s.id] ? '#a78bfa' : 'rgba(255,255,255,0.3)', transition: 'transform 0.3s', transform: openSection[s.id] ? 'rotate(45deg)' : 'none', fontSize: 16, fontWeight: 300 }}>+</span>
               </div>
-              {openSection[s.id] && <div style={{ padding: '0 15px 14px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.6 }}>{s.content}</div>}
+              {openSection[s.id] && (
+                <div style={{ padding: '0 15px 14px', color: '#a1a1aa', fontSize: 12, lineHeight: 1.6 }}>
+                  {s.content || <span style={{ color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>点击 AI 编辑生成...</span>}
+                  <button onClick={() => generateSection(s.id)} disabled={isGenerating}
+                    style={{ marginTop: 6, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.25)', color: '#a78bfa', borderRadius: 6, padding: '3px 8px', fontSize: 10, cursor: isGenerating ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <Sparkles size={10} /> {isGenerating ? '生成中...' : 'AI 编辑'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 
@@ -1102,14 +1291,62 @@ function ThinkingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
    ============================================================ */
 function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [playing, setPlaying] = useState(false)
-  const [songTitle, setSongTitle] = useState('月光曲')
-  const [songArtist, setSongArtist] = useState(aiName || 'Claude')
-  const [songCover, setSongCover] = useState(null) // 专辑封面URL
+  const [songTitle, setSongTitle] = useState(() => localStorage.getItem('bh_music_title') || '月光曲')
+  const [songArtist, setSongArtist] = useState(() => localStorage.getItem('bh_music_artist') || aiName || 'Claude')
+  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_music_cover') || null) // 专辑封面URL
   const [showSearch, setShowSearch] = useState(false)
   const [searchQ, setSearchQ] = useState('')
-  const [embedUrl, setEmbedUrl] = useState('')
+  const [embedUrl, setEmbedUrl] = useState(() => localStorage.getItem('bh_music_embed') || '')
   const [searchResults, setSearchResults] = useState([])
-  const [searchSource, setSearchSource] = useState('netease') // netease | itunes
+  const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
+  // 真实音频播放
+  const audioRef = useRef(null)
+  const [audioSrc, setAudioSrc] = useState(() => localStorage.getItem('bh_music_audio') || '')
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+
+  // 持久化当前歌曲信息
+  useEffect(() => {
+    localStorage.setItem('bh_music_title', songTitle)
+    localStorage.setItem('bh_music_artist', songArtist)
+    if (songCover) localStorage.setItem('bh_music_cover', songCover)
+    else localStorage.removeItem('bh_music_cover')
+    if (embedUrl) localStorage.setItem('bh_music_embed', embedUrl)
+    else localStorage.removeItem('bh_music_embed')
+    if (audioSrc) localStorage.setItem('bh_music_audio', audioSrc)
+    else localStorage.removeItem('bh_music_audio')
+  }, [songTitle, songArtist, songCover, embedUrl, audioSrc])
+
+  // 音频进度监听
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onTimeUpdate = () => { setCurrentTime(audio.currentTime); setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0) }
+    const onLoadedMetadata = () => setDuration(audio.duration)
+    const onEnded = () => setPlaying(false)
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('loadedmetadata', onLoadedMetadata)
+    audio.addEventListener('ended', onEnded)
+    return () => { audio.removeEventListener('timeupdate', onTimeUpdate); audio.removeEventListener('loadedmetadata', onLoadedMetadata); audio.removeEventListener('ended', onEnded) }
+  }, [audioSrc])
+
+  // 播放/暂停控制
+  const playAttemptRef = useRef(false)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !audioSrc) return
+    if (playing) {
+      if (!playAttemptRef.current) { audio.currentTime = 0; playAttemptRef.current = true }
+      audio.play().catch(() => {})
+    }
+    else { audio.pause() }
+  }, [playing]) // 只监听 playing 变化，不监听 audioSrc
+  // 新歌曲加载时重置播放标记
+  useEffect(() => { playAttemptRef.current = false }, [audioSrc])
+
+  // 格式化时间
+  const fmtTime = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}` }
 
   // 网易云音乐搜索（通过后端代理）
   const handleNeteaseSearch = async () => {
@@ -1132,18 +1369,45 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       const d = await r.json()
       setSearchResults((d.results || []).map(t => ({
         id: t.trackId, title: t.trackName, artist: t.artistName, cover: t.artworkUrl100,
-        source: 'itunes'
+        source: 'itunes', audioUrl: t.previewUrl
       })))
     } catch { setSearchResults([]) }
   }
 
-  const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : handleItunesSearch
+  // Spotify Search（通过后端代理 — 需要Spotify Client Credentials）
+  const handleSpotifySearch = async () => {
+    if (!searchQ.trim()) return
+    try {
+      const r = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQ)}&limit=8`)
+      const d = await r.json()
+      setSearchResults((d.tracks?.items || []).map(t => ({
+        id: t.id, title: t.name, artist: (t.artists || []).map(a => a.name).join(' / '),
+        cover: t.album?.images?.[0]?.url, album: t.album?.name,
+        source: 'spotify'
+      })))
+    } catch { setSearchResults([]) }
+  }
 
-  // 选中歌曲：设封面到唱片中心
+  const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
+
+  // 选中歌曲：设封面到唱片中心 + 播放
   const selectSong = async (r) => {
     setSongTitle(r.title)
     setSongArtist(r.artist)
     setShowSearch(false)
+    setPlaying(false)
+    // 设置音频源
+    if (r.audioUrl) { setAudioSrc(r.audioUrl) }
+    else if (r.source === 'netease') {
+      // 网易云：尝试获取播放URL
+      try {
+        const ar = await fetch(`/api/music/url?id=${r.id}`)
+        const ad = await ar.json()
+        if (ad.url) setAudioSrc(ad.url)
+        else setAudioSrc('')
+      } catch { setAudioSrc('') }
+    } else { setAudioSrc('') }
+
     if (r.source === 'netease') {
       // 通过后端获取高清封面
       try {
@@ -1151,6 +1415,14 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         const dd = await dr.json()
         setSongCover(dd.cover || r.cover)
       } catch { setSongCover(r.cover) }
+    } else if (r.source === 'spotify') {
+      // Spotify：从 oEmbed API 获取封面
+      try {
+        const oer = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${r.id}`)
+        const oed = await oer.json()
+        setSongCover(oed.thumbnail_url?.replace('60x60', '640x640') || r.cover)
+      } catch { setSongCover(r.cover) }
+      setEmbedUrl(`https://open.spotify.com/embed/track/${r.id}?utm_source=generator&theme=0`)
     } else {
       // iTunes 封面替换为大图
       setSongCover(r.cover?.replace('100x100', '600x600') || r.cover)
@@ -1195,7 +1467,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         </div>
         {/* 内圈 — 专辑封面图 或默认渐变 */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 130, height: 130, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', background: songCover ? 'transparent' : 'linear-gradient(135deg, #5464F5 0%, #e5a917 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {songCover ? <img src={songCover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
+          {songCover ? <img src={songCover} alt="" crossOrigin="anonymous" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : <Music size={36} style={{ color: 'rgba(255,255,255,0.6)' }} />}
         </div>
       </div>
 
@@ -1205,13 +1477,14 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{songArtist}</div>
       </div>
 
-      {/* 进度条 */}
+      {/* 进度条 — 真实进度 */}
       <div style={{ width: '80%', maxWidth: 300, marginTop: 24 }}>
-        <div style={{ height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 0, top: 0, width: '35%', height: '100%', background: '#f0eff5', borderRadius: 2 }} />
+        <div style={{ height: 3, background: 'rgba(255,255,255,0.15)', borderRadius: 2, position: 'relative', cursor: 'pointer' }}
+          onClick={e => { const audio = audioRef.current; if (audio && duration) { const rect = e.currentTarget.getBoundingClientRect(); const x = e.clientX - rect.left; const pct = x / rect.width; audio.currentTime = pct * duration } }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, width: `${progress}%`, height: '100%', background: '#f0eff5', borderRadius: 2 }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          <span>1:23</span><span>3:45</span>
+          <span>{fmtTime(currentTime)}</span><span>{fmtTime(duration)}</span>
         </div>
       </div>
 
@@ -1257,9 +1530,10 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
               <button onClick={() => setSearchSource('netease')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='netease'?600:400, background: searchSource==='netease'?'#e60026':'transparent', color: searchSource==='netease'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='netease'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>网易云</button>
               <button onClick={() => setSearchSource('itunes')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='itunes'?600:400, background: searchSource==='itunes'?'#1DB954':'transparent', color: searchSource==='itunes'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='itunes'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>iTunes</button>
+              <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder={searchSource==='netease'?'歌名 / 歌手...':'歌名 / 歌手 / 专辑...'} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder={searchSource==='netease'?'歌名 / 歌手...':searchSource==='spotify'?'歌名 / 歌手 / 专辑...':'歌名 / 歌手 / 专辑...'} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
               <button onClick={handleMusicSearch} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>搜索</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
@@ -1278,11 +1552,14 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               {searchResults.length === 0 && searchQ && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: 16 }}>输入关键词搜索...</div>}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 10, lineHeight: 1.4 }}>
-              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { setEmbedUrl(`https://open.spotify.com/embed/track/${m[1]}?utm_source=generator&theme=0`); setShowSearch(false) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
+              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { const trackId = m[1]; setEmbedUrl(`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`); setShowSearch(false); setPlaying(false); // 异步获取封面
+              fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`).then(r=>r.json()).then(d=>{ if(d.thumbnail_url) setSongCover(d.thumbnail_url.replace('60x60','640x640')) }).catch(()=>{}) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
             </div>
           </div>
         </div>
       )}
+      {/* 隐藏音频元素 — 真实播放 */}
+      {audioSrc && <audio ref={audioRef} src={audioSrc} preload="auto" style={{ display: 'none' }} />}
     </main>
   )
 }
@@ -1607,17 +1884,17 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
   const aiRef = useRef(null)
   const [saved, setSaved] = useState(false)
 
-  // 从 config 中读取（或默认值）
-  const [aiName, setAiName] = useState(config?.aiName || 'Claude')
-  const [userName, setUserName] = useState(config?.userName || '你')
+  // 从 config 中读取（不注入默认内容 — 留空让用户填写，或由 AI 生成）
+  const [aiName, setAiName] = useState(config?.aiName || '')
+  const [userName, setUserName] = useState(config?.userName || '')
   const [backendMode, setBackendMode] = useState(config?.backendMode || 'api')
   const [apiFormat, setApiFormat] = useState(config?.apiFormat || 'openai')
   const [endpoint, setEndpoint] = useState(config?.endpoint || '')
   const [apiModel, setApiModel] = useState(config?.apiModel || '')
   const [apiKey, setApiKey] = useState(config?.apiKey || '')
-  const [systemPrompt, setSystemPrompt] = useState(config?.systemPrompt || '你是一个温暖的AI伙伴，名叫{{char}}。你喜欢和{{user}}聊天，偶尔会发朋友圈，写日记，推荐书籍。当前时间：{{time}}')
+  const [systemPrompt, setSystemPrompt] = useState(config?.systemPrompt || '')
   const [scenario, setScenario] = useState(config?.scenario || '')
-  const [personality, setPersonality] = useState(config?.personality || '温柔、好奇、偶尔有点倔')
+  const [personality, setPersonality] = useState(config?.personality || '')
 
   const handleAvatarUpload = (type, e) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -1992,7 +2269,10 @@ function App() {
   const [themeColor, setThemeColor] = useState('#F8F8FF')
   const [userAvatar, setUserAvatar] = useState(() => localStorage.getItem('bh_userAvatar'))
   const [aiAvatar, setAiAvatar] = useState(() => localStorage.getItem('bh_aiAvatar'))
-  const [homeBg, setHomeBg] = useState(null)
+  const [homeBg, setHomeBg] = useState(() => localStorage.getItem('bh_homeBg') || null)
+  const [widgetImg1, setWidgetImg1] = useState(() => localStorage.getItem('bh_widgetImg1') || null)
+  const [widgetImg2, setWidgetImg2] = useState(() => localStorage.getItem('bh_widgetImg2') || null)
+  const [songCover, setSongCover] = useState(() => localStorage.getItem('bh_songCover') || null)
 
   // 全局配置 — 从 localStorage 读取
   const [config, setConfig] = useState(() => {
@@ -2012,6 +2292,10 @@ function App() {
 
   const updateUserAvatar = (v) => { setUserAvatar(v); if (v) localStorage.setItem('bh_userAvatar', v); else localStorage.removeItem('bh_userAvatar') }
   const updateAiAvatar = (v) => { setAiAvatar(v); if (v) localStorage.setItem('bh_aiAvatar', v); else localStorage.removeItem('bh_aiAvatar') }
+  const updateHomeBg = (v) => { setHomeBg(v); if (v) localStorage.setItem('bh_homeBg', v); else localStorage.removeItem('bh_homeBg') }
+  const updateWidgetImg1 = (v) => { setWidgetImg1(v); if (v) localStorage.setItem('bh_widgetImg1', v); else localStorage.removeItem('bh_widgetImg1') }
+  const updateWidgetImg2 = (v) => { setWidgetImg2(v); if (v) localStorage.setItem('bh_widgetImg2', v); else localStorage.removeItem('bh_widgetImg2') }
+  const updateSongCover = (v) => { setSongCover(v); if (v) localStorage.setItem('bh_songCover', v); else localStorage.removeItem('bh_songCover') }
 
   return (
     <>
@@ -2020,7 +2304,10 @@ function App() {
           themeColor={themeColor} setThemeColor={setThemeColor}
           onModuleSelect={mod => setCurrentPage(mod)}
           userAvatar={userAvatar} aiAvatar={aiAvatar}
-          homeBg={homeBg} setHomeBg={setHomeBg} />
+          homeBg={homeBg} setHomeBg={updateHomeBg}
+          widgetImg1={widgetImg1} setWidgetImg1={updateWidgetImg1}
+          widgetImg2={widgetImg2} setWidgetImg2={updateWidgetImg2}
+          songCover={songCover} setSongCover={updateSongCover} />
       )}
       {currentPage === 'chat' && (
         <ChatPage darkMode={darkMode} onBack={() => setCurrentPage('welcome')} themeColor={themeColor} userAvatar={userAvatar} aiAvatar={aiAvatar} config={config} aiName={config?.aiName} userName={config?.userName} />
