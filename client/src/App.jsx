@@ -1845,6 +1845,45 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
 /* ============================================================
    Settings — iOS 风格设置页 (kimi-room 风格完整配置)
    ============================================================ */
+// ★ 关键修复：Section / Field / Segmented 提取到函数外部，
+//   用 React.memo 包裹防止 SettingsPage 每次 re-render 时重建组件 → IME 被打断
+const SettingsSection = React.memo(({ title, children, ios }) => (
+  <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
+    <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>{title}</div>
+    {children}
+  </div>
+))
+
+const SettingsField = React.memo(({ label, value, onChange, placeholder, type = 'text', rows, ios }) => (
+  <div style={{ marginBottom: rows ? 12 : 8 }}>
+    <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
+    {rows ? (
+      <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
+    ) : type === 'password' ? (
+      <input type="password" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+    ) : (
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
+    )}
+  </div>
+))
+
+const SettingsSegmented = React.memo(({ options, value, onChange, ios }) => (
+  <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
+    {options.map(opt => (
+      <button key={opt.id} onClick={() => onChange(opt.id)}
+        style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: value === opt.id ? 600 : 400,
+          background: value === opt.id ? ios.accent : 'transparent',
+          color: value === opt.id ? '#fff' : ios.textMuted,
+          border: 'none', cursor: 'pointer' }}>
+        {opt.name}
+      </button>
+    ))}
+  </div>
+))
+
 function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, setAiAvatar, config, updateConfig }) {
   const ios = darkMode
     ? { bg: '#0a0a0c', cardBg: '#1c1c1e', cardBorder: 'rgba(255,255,255,0.08)',
@@ -1898,8 +1937,7 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
         {/* —— 身份 —— */}
-        <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
-          <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>身份</div>
+        <SettingsSection ios={ios} title="身份">
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 14 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div onClick={() => userRef.current?.click()} style={{ width: 52, height: 52, borderRadius: '50%', border: `2px dashed ${ios.inputBorder}`, overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ios.inputBg }}>
@@ -1916,76 +1954,43 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
               <input ref={aiRef} type="file" accept="image/*" hidden onChange={e => handleAvatarUpload('ai', e)} />
             </div>
           </div>
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{`TA 的名字（在 {{char}} 占位符中被替换）`}</div>
-            <input type="text" value={aiName} onChange={e => setAiName(e.target.value)} placeholder="Bunny" style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{`你的名字（在 {{user}} 占位符中被替换）`}</div>
-            <input type="text" value={userName} onChange={e => setUserName(e.target.value)} placeholder="你的名字" style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
-        </div>
+          <SettingsField ios={ios} label={`TA 的名字（在 {{char}} 占位符中被替换）`} value={aiName} onChange={setAiName} placeholder="Bunny" />
+          <SettingsField ios={ios} label={`你的名字（在 {{user}} 占位符中被替换）`} value={userName} onChange={setUserName} placeholder="你的名字" />
+        </SettingsSection>
 
         {/* —— LLM 接口 —— */}
-        <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
-          <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>LLM 接口</div>
+        <SettingsSection ios={ios} title="LLM 接口">
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 6 }}>后端模式</div>
-            <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
-              <button onClick={() => setBackendMode('api')} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: backendMode==='api'?600:400, background: backendMode==='api'?ios.accent:'transparent', color: backendMode==='api'?'#fff':ios.textMuted, border: 'none', cursor: 'pointer' }}>API 模式</button>
-              <button onClick={() => setBackendMode('cli')} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: backendMode==='cli'?600:400, background: backendMode==='cli'?ios.accent:'transparent', color: backendMode==='cli'?'#fff':ios.textMuted, border: 'none', cursor: 'pointer' }}>Claude Code (本地)</button>
-            </div>
+            <SettingsSegmented ios={ios} options={[{ id: 'api', name: 'API 模式' }, { id: 'cli', name: 'Claude Code (本地)' }]} value={backendMode} onChange={setBackendMode} />
             {backendMode === 'cli' && <div style={{ fontSize: 10, color: ios.textMuted, marginTop: 6, lineHeight: 1.4 }}>选 Claude Code 走本地 CLI，不需要 API Key</div>}
           </div>
 
           {backendMode === 'api' && (<>
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 6 }}>API 格式</div>
-              <div style={{ display: 'flex', background: ios.inputBg, borderRadius: 8, overflow: 'hidden', border: `0.5px solid ${ios.inputBorder}` }}>
-                <button onClick={() => setApiFormat('openai')} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: apiFormat==='openai'?600:400, background: apiFormat==='openai'?ios.accent:'transparent', color: apiFormat==='openai'?'#fff':ios.textMuted, border: 'none', cursor: 'pointer' }}>OpenAI 兼容</button>
-                <button onClick={() => setApiFormat('anthropic')} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: apiFormat==='anthropic'?600:400, background: apiFormat==='anthropic'?ios.accent:'transparent', color: apiFormat==='anthropic'?'#fff':ios.textMuted, border: 'none', cursor: 'pointer' }}>Anthropic 原生</button>
-              </div>
+              <SettingsSegmented ios={ios} options={[{ id: 'openai', name: 'OpenAI 兼容' }, { id: 'anthropic', name: 'Anthropic 原生' }]} value={apiFormat} onChange={setApiFormat} />
               <div style={{ fontSize: 10, color: ios.textMuted, marginTop: 6, lineHeight: 1.4 }}>{apiFormat === 'openai' ? '绝大多数中转站、OpenRouter、DeepSeek、Ollama 等都用 OpenAI 格式' : 'Anthropic 官方 API 原生格式'}</div>
             </div>
-            <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>Endpoint</div>
-            <input type="text" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder={apiFormat === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.anthropic.com/v1/messages'} style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
-            <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>Model</div>
-            <input type="text" value={apiModel} onChange={e => setApiModel(e.target.value)} placeholder="gpt-4o / claude-sonnet-4-20250514" style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
-            <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>API Key</div>
-            <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
+            <SettingsField ios={ios} label="Endpoint" value={endpoint} onChange={setEndpoint} placeholder={apiFormat === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.anthropic.com/v1/messages'} />
+            <SettingsField ios={ios} label="Model" value={apiModel} onChange={setApiModel} placeholder="gpt-4o / claude-sonnet-4-20250514" />
+            <SettingsField ios={ios} label="API Key" value={apiKey} onChange={setApiKey} placeholder="sk-..." type="password" />
           </>)}
-        </div>
+        </SettingsSection>
 
         {/* —— 人设 —— */}
-        <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
-          <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>人设</div>
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>性格描述</div>
-            <input type="text" value={personality} onChange={e => setPersonality(e.target.value)} placeholder="温柔、好奇、偶尔有点倔" style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>场景设定 (Scenario)</div>
-            <textarea value={scenario} onChange={e => setScenario(e.target.value)} placeholder="一只住在云上的兔子，有一个温暖的小窝..." rows={2} style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
-          </div>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>系统提示词 (System Prompt)</div>
-            <textarea value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} placeholder="你是一个温暖的AI伙伴..." rows={4} style={{ width: '100%', background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: 10, fontSize: 13, fontFamily: 'inherit', resize: 'vertical', lineHeight: 1.5, outline: 'none' }} />
-          </div>
+        <SettingsSection ios={ios} title="人设">
+          <SettingsField ios={ios} label="性格描述" value={personality} onChange={setPersonality} placeholder="温柔、好奇、偶尔有点倔" />
+          <SettingsField ios={ios} label="场景设定 (Scenario)" value={scenario} onChange={setScenario} placeholder="一只住在云上的兔子，有一个温暖的小窝..." rows={2} />
+          <SettingsField ios={ios} label="系统提示词 (System Prompt)" value={systemPrompt} onChange={setSystemPrompt} placeholder="你是一个温暖的AI伙伴..." rows={4} />
           <div style={{ fontSize: 10, color: ios.textMuted, lineHeight: 1.4 }}>支持占位符：{'{{char}}'} = AI名字, {'{{user}}'} = 你的名字, {'{{time}}'} = 当前时间</div>
-        </div>
+        </SettingsSection>
 
         {/* —— 关于 —— */}
-        <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
-          <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>关于</div>
+        <SettingsSection ios={ios} title="关于">
           <div style={{ fontSize: 13, color: ios.text, lineHeight: 1.6 }}>Eidos — Relationship Operating System</div>
           <div style={{ fontSize: 11, color: ios.textMuted, marginTop: 4 }}>Version 0.1 · Built with ❤️</div>
-        </div>
+        </SettingsSection>
 
         {/* 保存按钮 */}
         <button onClick={handleSave}
