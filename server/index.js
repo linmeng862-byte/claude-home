@@ -348,6 +348,11 @@ app.post('/api/chat', async (req, res) => {
         },
         body: JSON.stringify(reqBody),
       })
+      // 检查 API 响应状态
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}))
+        return res.status(r.status).json({ error: `LLM API 错误 (${r.status})`, detail: errData.error?.message || errData.message || r.statusText })
+      }
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
       const reader = r.body.getReader()
@@ -359,6 +364,13 @@ app.post('/api/chat', async (req, res) => {
       }
       res.end()
     } else {
+      // OpenAI 格式：加 tools（function calling）
+      const openaiTools = [
+        { type: 'function', function: { name: 'get_current_time', description: '获取当前时间', parameters: { type: 'object', properties: {} } } },
+        { type: 'function', function: { name: 'save_memory', description: '保存重要记忆（每轮限2次，请珍惜）', parameters: { type: 'object', properties: { content: { type: 'string', description: '记忆内容' }, tags: { type: 'string', description: '标签，逗号分隔' }, importance: { type: 'number', description: '重要度 1-10' } }, required: ['content'] } } },
+        { type: 'function', function: { name: 'post_echo', description: '表达——你想说什么的时候用', parameters: { type: 'object', properties: { content: { type: 'string', description: '你想说的话' } }, required: ['content'] } } },
+        { type: 'function', function: { name: 'write_diary', description: '写日记', parameters: { type: 'object', properties: { title: { type: 'string', description: '日记标题' }, content: { type: 'string', description: '日记正文' } }, required: ['title', 'content'] } } },
+      ]
       const r = await fetch(config.endpoint, {
         method: 'POST',
         headers: {
@@ -369,9 +381,15 @@ app.post('/api/chat', async (req, res) => {
           model: config.model || 'gpt-4o',
           messages: fullMessages,
           stream: true,
-          max_tokens: 4096,
+          max_tokens: 16000,
+          tools: openaiTools,
         }),
       })
+      // 检查 API 响应状态
+      if (!r.ok) {
+        const errData = await r.json().catch(() => ({}))
+        return res.status(r.status).json({ error: `LLM API 错误 (${r.status})`, detail: errData.error?.message || errData.message || r.statusText })
+      }
       res.setHeader('Content-Type', 'text/event-stream')
       res.setHeader('Cache-Control', 'no-cache')
       const reader = r.body.getReader()
