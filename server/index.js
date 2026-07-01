@@ -103,6 +103,77 @@ app.get('/api/memory/evolution/:section', async (req, res) => {
   catch (e) { res.status(502).json({ error: e.message }) }
 })
 
+// ============ Echo / Diary 同步接口 ============
+// 从 Brain 拉取带 [echo] / [diary] 标签的 bucket，解析为前端可用的结构
+app.get('/api/sync/echoes', async (req, res) => {
+  const cookie = req.headers['x-ombre-cookie'] || ''
+  if (!cookie) return res.json({ echoes: [] })
+  try {
+    const data = await ombreProxy('/api/buckets', { headers: { Cookie: cookie } })
+    const buckets = data.buckets || []
+    // 筛选带 echo 标签的 bucket
+    const echoes = buckets
+      .filter(b => (b.metadata?.tags || []).includes('echo') || b.content?.startsWith('[echo]'))
+      .map(b => {
+        // 尝试从 extra 恢复结构化数据，否则从 content 解析
+        let content = b.content || ''
+        if (content.startsWith('[echo]')) content = content.replace(/^\[echo]\s*/, '')
+        return {
+          id: b.metadata?.id || b.id || Date.now(),
+          name: b.metadata?.extra?.aiName || 'Claude',
+          avatar: b.metadata?.extra?.aiAvatar || null,
+          remark: '✦ AI',
+          verified: true,
+          content,
+          time: b.metadata?.created ? new Date(b.metadata.created).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+          brainId: b.metadata?.id, // 保留 Brain bucket ID 用于去重
+        }
+      })
+      .reverse() // 最新的在前
+    res.json({ echoes })
+  } catch (e) { res.json({ echoes: [], error: e.message }) }
+})
+
+app.get('/api/sync/diaries', async (req, res) => {
+  const cookie = req.headers['x-ombre-cookie'] || ''
+  if (!cookie) return res.json({ diaries: [] })
+  try {
+    const data = await ombreProxy('/api/buckets', { headers: { Cookie: cookie } })
+    const buckets = data.buckets || []
+    const diaries = buckets
+      .filter(b => (b.metadata?.tags || []).includes('diary') || b.content?.startsWith('[diary]'))
+      .map(b => {
+        let content = b.content || ''
+        let title = ''
+        if (content.startsWith('[diary]')) {
+          content = content.replace(/^\[diary]\s*/, '')
+          // 格式: "标题: 正文" — 尝试分离
+          const colonIdx = content.indexOf(':')
+          if (colonIdx > 0 && colonIdx < 30) {
+            title = content.slice(0, colonIdx).trim()
+            content = content.slice(colonIdx + 1).trim()
+          }
+        }
+        // 如果 extra 里有结构化数据，优先使用
+        title = b.metadata?.extra?.title || title
+        content = b.metadata?.extra?.diaryContent || content
+        const created = b.metadata?.created || b.metadata?.last_active
+        const d = created ? new Date(created) : new Date()
+        return {
+          id: b.metadata?.id || Date.now(),
+          date: `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`,
+          time: `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`,
+          title: title || '无题',
+          content,
+          checklist: [],
+          brainId: b.metadata?.id,
+        }
+      })
+      .reverse()
+    res.json({ diaries })
+  } catch (e) { res.json({ diaries: [], error: e.message }) }
+})
+
 // ── 网易云音乐搜索代理（搜索 + 播放URL + 封面全链路可用）──
 const NETEASE_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -475,7 +546,7 @@ app.post('/api/tools/call', async (req, res) => {
         // 写入 Brain Bucket 作为 Experience，Brain 自己决定是否形成 Echo
         if (cookie) {
           pressure += PRESSURE_MAP.echo || 5
-          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: IMPORTANCE_MAP.echo }) }).catch(() => {})
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[echo] ${args.content}`, tags: 'echo', importance: IMPORTANCE_MAP.echo, extra: { aiName: args.aiName || 'Claude', aiAvatar: args.aiAvatar || '', echoContent: args.content } }) }).catch(() => {})
         }
         return res.json({ result: 'ok', content: args.content, type: 'echo' })
       }
@@ -483,7 +554,7 @@ app.post('/api/tools/call', async (req, res) => {
         // Diary → Experience → Brain
         if (cookie) {
           pressure += PRESSURE_MAP.diary || 4
-          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: IMPORTANCE_MAP.diary }) }).catch(() => {})
+          fetch(`${OMBRE_BRAIN}/api/buckets`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ content: `[diary] ${args.title}: ${args.content}`, tags: 'diary', importance: IMPORTANCE_MAP.diary, extra: { title: args.title, diaryContent: args.content } }) }).catch(() => {})
         }
         return res.json({ result: 'ok', title: args.title, content: args.content, type: 'diary' })
       }

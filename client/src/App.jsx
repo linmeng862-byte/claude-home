@@ -692,6 +692,28 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
     window.addEventListener('ai-echo', handler)
     return () => window.removeEventListener('ai-echo', handler)
   }, [])
+
+  // ★ Brain 同步：从 Ombre Brain 拉取 echo 数据，与本地合并
+  useEffect(() => {
+    const cookie = localStorage.getItem('bh_ombre_cookie') || ''
+    if (!cookie) return // 未登录 Brain 则不同步
+    fetch('/api/sync/echoes', { headers: { 'x-ombre-cookie': cookie } })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.echoes?.length) return
+        setAiPosts(prev => {
+          // 用 brainId 去重：本地已有此 Brain 条目的就跳过
+          const localBrainIds = new Set(prev.filter(p => p.brainId).map(p => p.brainId))
+          const newFromBrain = data.echoes.filter(e => !localBrainIds.has(e.brainId))
+          if (newFromBrain.length === 0) return prev
+          // 合并：Brain 的放在后面（它们是历史数据，本地的最新在前）
+          const merged = [...prev, ...newFromBrain]
+          localStorage.setItem('bh_echoes', JSON.stringify(merged))
+          return merged
+        })
+      })
+      .catch(() => {}) // 静默失败，不影响本地使用
+  }, [])
   const allPosts = [...aiPosts]
   const [likedPosts, setLikedPosts] = useState({})
   const [tasksDrawer, setTasksDrawer] = useState(false)
@@ -877,6 +899,26 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
     }
     window.addEventListener('ai-diary', handler)
     return () => window.removeEventListener('ai-diary', handler)
+  }, [])
+
+  // ★ Brain 同步：从 Ombre Brain 拉取 diary 数据，与本地合并
+  useEffect(() => {
+    const cookie = localStorage.getItem('bh_ombre_cookie') || ''
+    if (!cookie) return
+    fetch('/api/sync/diaries', { headers: { 'x-ombre-cookie': cookie } })
+      .then(r => r.json())
+      .then(data => {
+        if (!data.diaries?.length) return
+        setDiaries(prev => {
+          const localBrainIds = new Set(prev.filter(d => d.brainId).map(d => d.brainId))
+          const newFromBrain = data.diaries.filter(d => !localBrainIds.has(d.brainId))
+          if (newFromBrain.length === 0) return prev
+          const merged = [...prev, ...newFromBrain]
+          localStorage.setItem('bh_diaries', JSON.stringify(merged))
+          return merged
+        })
+      })
+      .catch(() => {})
   }, [])
 
   const startEdit = (d) => {
