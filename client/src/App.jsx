@@ -1885,13 +1885,13 @@ const SettingsSegmented = React.memo(({ options, value, onChange, ios }) => (
 ))
 
 function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, setAiAvatar, config, updateConfig }) {
-  const ios = darkMode
+  const ios = useMemo(() => darkMode
     ? { bg: '#0a0a0c', cardBg: '#1c1c1e', cardBorder: 'rgba(255,255,255,0.08)',
         text: '#f0eff5', textMuted: '#8e8e93', accent: '#5464F5', separator: 'rgba(255,255,255,0.06)',
         inputBg: '#2c2c2e', inputBorder: 'rgba(255,255,255,0.1)' }
     : { bg: '#F8F8FF', cardBg: '#ffffff', cardBorder: 'rgba(0,0,0,0.06)',
         text: '#1c1c1e', textMuted: '#8e8e93', accent: '#5464F5', separator: 'rgba(0,0,0,0.06)',
-        inputBg: '#f2f2f7', inputBorder: 'rgba(0,0,0,0.08)' }
+        inputBg: '#f2f2f7', inputBorder: 'rgba(0,0,0,0.08)' }, [darkMode])
 
   const userRef = useRef(null)
   const aiRef = useRef(null)
