@@ -1,23 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useReducer } from 'react'
-
-// ============ IME 输入法兼容 Hook ============
-// 解决中文/日文/韩文输入法在 React 受控输入中组字被中断的问题
-// 策略：onChange 始终更新 state（保证移动端/英文输入正常显示），
-//       compositionEnd 时额外 flush 一次最终合成值，防止 PC 端拼音被截断。
-function useIMEInput(initialValue, setState) {
-  const handleChange = useCallback((e) => {
-    // 始终更新 state，移动端和英文输入完全正常
-    setState(e.target.value)
-  }, [setState])
-  const compositionProps = {
-    onCompositionEnd: useCallback((e) => {
-      // PC 端某些浏览器 compositionEnd 顺序晚于 onChange，
-      // 这里再 flush 一次，确保最终汉字写入 state
-      setState(e.target.value)
-    }, [setState]),
-  }
-  return { handleChange, compositionProps }
-}
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Send, Plus, MessageSquare, Settings, Trash2,
   ChevronLeft, ChevronRight, Bot, User, Sparkles,
@@ -490,7 +471,6 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
     { id: 3, role: 'assistant', content: '今天有什么想聊的吗？', thinking: null, created_at: '2026-06-28T17:00:22' },
   ])
   const [inputValue, setInputValue] = useState('')
-  const chatIME = useIMEInput(inputValue, setInputValue)
   const [isTyping, setIsTyping] = useState(false)
   const [thinkingSheet, setThinkingSheet] = useState(null)
   const [pendingImage, setPendingImage] = useState(null)
@@ -619,7 +599,7 @@ function ChatPage({ darkMode, onBack, themeColor, userAvatar, aiAvatar, config }
         <div className="ch-composer-inner" style={{background:dark?'rgba(44,44,46,0.9)':'rgba(255,255,255,0.92)',borderColor:dark?'rgba(255,255,255,0.08)':'rgba(60,60,67,0.1)'}}>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)'}}><Mic size={20}/></button>
           {pendingImage&&<div style={{position:'relative',padding:'2px 4px 0',flexShrink:0}}><img src={pendingImage} alt="" style={{height:32,borderRadius:6}}/><button onClick={()=>setPendingImage(null)} style={{position:'absolute',top:-2,right:-6,background:dark?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.1)',color:dark?'#fff':'#000',border:'none',borderRadius:'50%',width:16,height:16,fontSize:10,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>×</button></div>}
-          <textarea className="ch-composer-field" value={inputValue} onChange={chatIME.handleChange} {...chatIME.compositionProps} onKeyDown={handleKeyDown} placeholder="Write a message…" rows={1} style={{color:dark?'#e5e5ea':'#1c1c1e'}}/>
+          <textarea className="ch-composer-field" value={inputValue} onChange={e=>setInputValue(e.target.value)} onKeyDown={handleKeyDown} placeholder="Write a message…" rows={1} style={{color:dark?'#e5e5ea':'#1c1c1e'}}/>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)',fontSize:18}}>😊</button>
           <button className="ch-composer-icon" style={{color:dark?'rgba(255,255,255,0.4)':'rgba(60,60,67,0.4)'}} onClick={()=>imageInputRef.current?.click()}><Plus size={20}/></button>
           <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={handleImageUpload}/>
@@ -696,7 +676,6 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
   })
   const [allComments, setAllComments] = useState({}) // { postId: [{name, text}] }
   const [commentText, setCommentText] = useState('')
-  const commentIME = useIMEInput(commentText, setCommentText)
   const [commentingPostId, setCommentingPostId] = useState(null)
 
   // 监听 AI 发的朋友圈事件
@@ -808,7 +787,7 @@ function EchoPage({ darkMode, onBack, userAvatar, aiAvatar, aiName, userName }) 
             {/* 评论输入 */}
             {commentingPostId === post.id ? (
               <div style={{ display: 'flex', gap: 8, padding: '0 0 8px', alignItems: 'center' }}>
-                <input value={commentText} onChange={commentIME.handleChange} {...commentIME.compositionProps}
+                <input value={commentText} onChange={e => setCommentText(e.target.value)}
                   onKeyDown={e => { if(e.key==='Enter') submitComment(post.id, post.content) }}
                   placeholder="写评论..." autoFocus
                   style={{ flex: 1, background: ios.searchBg, color: ios.text, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
@@ -881,8 +860,6 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
-  const diaryTitleIME = useIMEInput(editTitle, setEditTitle)
-  const diaryContentIME = useIMEInput(editContent, setEditContent)
   const [showList, setShowList] = useState(true)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const diaryImageRef = useRef(null)
@@ -919,7 +896,6 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
   // 清单项编辑
   const [editingCheckIdx, setEditingCheckIdx] = useState(-1)
   const [editCheckText, setEditCheckText] = useState('')
-  const checkTextIME = useIMEInput(editCheckText, setEditCheckText)
 
   const startEditCheck = (idx) => {
     setEditingCheckIdx(idx)
@@ -1017,8 +993,8 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 80px' }}>
         {editing ? (
           <>
-            <input value={editTitle} onChange={diaryTitleIME.handleChange} {...diaryTitleIME.compositionProps} placeholder="标题" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 28, fontWeight: 700, color: n.text, fontFamily: n.sans, width: '100%', marginBottom: 8, letterSpacing: -0.5 }} />
-            <textarea value={editContent} onChange={diaryContentIME.handleChange} {...diaryContentIME.compositionProps} placeholder="写点什么..." rows={10} style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: n.text, fontFamily: n.serif, width: '100%', resize: 'none', lineHeight: 1.8, letterSpacing: 0.2 }} />
+            <input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="标题" style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 28, fontWeight: 700, color: n.text, fontFamily: n.sans, width: '100%', marginBottom: 8, letterSpacing: -0.5 }} />
+            <textarea value={editContent} onChange={e => setEditContent(e.target.value)} placeholder="写点什么..." rows={10} style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 16, color: n.text, fontFamily: n.serif, width: '100%', resize: 'none', lineHeight: 1.8, letterSpacing: 0.2 }} />
           </>
         ) : (
           <>
@@ -1038,7 +1014,7 @@ function DiaryPage({ darkMode, onBack, aiName, config }) {
                       {item.done && <CheckCircle size={12} style={{ color: n.accent }} />}
                     </div>
                     {editingCheckIdx === i ? (
-                      <input value={editCheckText} onChange={checkTextIME.handleChange} {...checkTextIME.compositionProps} onBlur={saveEditCheck} onKeyDown={e => e.key === 'Enter' && saveEditCheck()} autoFocus
+                      <input value={editCheckText} onChange={e => setEditCheckText(e.target.value)} onBlur={saveEditCheck} onKeyDown={e => e.key === 'Enter' && saveEditCheck()} autoFocus
                         style={{ flex: 1, border: 'none', outline: 'none', background: 'rgba(120,120,128,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 15, color: n.text, fontFamily: n.serif }} />
                     ) : (
                       <span onClick={() => startEditCheck(i)} style={{ flex: 1, fontSize: 15, color: item.done ? n.textMuted : n.text, textDecoration: item.done ? 'line-through' : 'none', fontFamily: n.serif, cursor: 'text' }}>{item.text}</span>
@@ -1200,10 +1176,8 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [embedUrl, setEmbedUrl] = useState('') // 不持久化 — 避免每次进入都弹 Spotify 浮窗
-  const musicSearchIME = useIMEInput(searchQ, setSearchQ)
   const [searchResults, setSearchResults] = useState([])
-  const [searchSource, setSearchSource] = useState('itunes') // netease | itunes | spotify
-  const localAudioRef = useRef(null) // 本地音频上传 input ref
+  const [searchSource, setSearchSource] = useState('netease') // netease | itunes | spotify
   const [searching, setSearching] = useState(false)
   const [audioLoading, setAudioLoading] = useState(false) // 歌曲URL加载中
   // 真实音频播放
@@ -1269,7 +1243,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
   // 格式化时间
   const fmtTime = (s) => { if (!s || isNaN(s)) return '0:00'; const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}` }
 
-  // ── 网易云音乐搜索（需后端 NeteaseCloudMusicApi 支持）──
+  // ── 网易云音乐搜索（搜索 + 播放URL + 封面全链路可用）──
   const handleNeteaseSearch = async () => {
     if (!searchQ.trim()) return
     setSearching(true); setSearchResults([])
@@ -1288,7 +1262,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
       }
     } catch (e) {
       console.error('网易云搜索失败:', e)
-      setSearchResults([{ id: '__error', title: '网易云搜索暂不可用，建议使用 iTunes 源', artist: e.message, source: 'netease' }])
+      setSearchResults([{ id: '__error', title: '搜索失败，请稍后重试', artist: e.message, source: 'netease' }])
     } finally { setSearching(false) }
   }
 
@@ -1325,20 +1299,6 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
 
   const handleMusicSearch = searchSource === 'netease' ? handleNeteaseSearch : searchSource === 'spotify' ? handleSpotifySearch : handleItunesSearch
 
-  // 上传本地音乐文件
-  const handleLocalAudio = (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    const name = file.name.replace(/\.[^.]+$/, '')
-    setSongTitle(name)
-    setSongArtist('本地音乐')
-    setAudioSrc(url)
-    setShowSearch(false)
-    setEmbedUrl('')
-    setPlaying(false)
-  }
-
   // 选中歌曲：设封面到唱片中心 + 获取URL后自动播放
   const selectSong = async (r) => {
     setSongTitle(r.title); setSongArtist(r.artist); setShowSearch(false); setPlaying(false)
@@ -1368,19 +1328,19 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
         } catch { setSongCover(null) }
       }
     } else if (r.source === 'spotify') {
-      // Spotify 无法直接播放音频，只设置封面
       try {
         const oer = await fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${r.id}`)
         const oed = await oer.json()
         setSongCover(oed.thumbnail_url?.replace('60x60', '640x640') || r.cover)
       } catch { setSongCover(r.cover) }
-      // 不设置 embedUrl — Spotify iframe 在移动端体验差且无法控制
+      setEmbedUrl(`https://open.spotify.com/embed/track/${r.id}?utm_source=generator&theme=0`)
     } else {
       setSongCover(r.cover?.replace('100x100', '600x600') || r.cover)
     }
 
     // URL 就绪后自动播放
     if (url) {
+      // 需要等 React 把 <audio key={url}> 渲染出来，用 setTimeout 让 ref 生效
       setTimeout(() => {
         const audio = audioRef.current
         if (audio) {
@@ -1505,11 +1465,9 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               <button onClick={() => setSearchSource('itunes')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='itunes'?600:400, background: searchSource==='itunes'?'#1DB954':'transparent', color: searchSource==='itunes'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='itunes'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>iTunes</button>
               <button onClick={() => setSearchSource('spotify')} style={{ flex: 1, padding: '6px 0', fontSize: 12, fontWeight: searchSource==='spotify'?600:400, background: searchSource==='spotify'?'#1DB954':'transparent', color: searchSource==='spotify'?'#fff':'rgba(255,255,255,0.5)', border: searchSource==='spotify'?'none':'1px solid rgba(255,255,255,0.15)', borderRadius: 8, cursor: 'pointer' }}>Spotify</button>
             </div>
-            {searchSource === 'netease' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>⚠️ 网易云需后端部署 NeteaseCloudMusicApi 才能搜索，否则请用 iTunes 源</div>}
-            {searchSource === 'spotify' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginBottom: 8, lineHeight: 1.4 }}>Spotify 搜索无凭证时自动回退 iTunes，仅能播放 30 秒预览</div>}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <input value={searchQ} onChange={musicSearchIME.handleChange} {...musicSearchIME.compositionProps} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
-              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1, minWidth: 56 }}>{searching?'...' : '搜索'}</button>
+              <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleMusicSearch()} placeholder="歌名 / 歌手..." style={{ flex: 1, background: 'rgba(255,255,255,0.08)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', fontSize: 14, outline: 'none' }} />
+              <button onClick={handleMusicSearch} disabled={searching} style={{ background: searchSource==='netease'?'#e60026':'#1DB954', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 13, cursor: searching?'wait':'pointer', fontWeight: 600, opacity: searching?0.7:1 }}>{searching?'...' : '搜索'}</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: 'auto' }}>
               {searchResults.map((r, i) => (
@@ -1527,9 +1485,7 @@ function MusicPage({ darkMode, onBack, userAvatar, aiAvatar, aiName }) {
               {searchResults.length === 0 && !searching && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', padding: 16 }}>输入关键词后点击搜索</div>}
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 10, lineHeight: 1.4 }}>
-              📁 也可以上传本地音乐：
-              <button onClick={() => localAudioRef.current?.click()} style={{ marginTop: 6, width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, cursor: 'pointer' }}>选择本地 MP3 文件</button>
-              <input ref={localAudioRef} type="file" accept="audio/*" hidden onChange={handleLocalAudio} />
+              💡 也可以直接粘贴 Spotify 链接：<input placeholder="https://open.spotify.com/track/..." onChange={e => { const m = e.target.value.match(/track\/(\w+)/); if (m) { const trackId = m[1]; setEmbedUrl(`https://open.spotify.com/embed/track/${trackId}?utm_source=generator&theme=0`); setShowSearch(false); setPlaying(false); fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${trackId}`).then(r=>r.json()).then(d=>{ if(d.thumbnail_url) setSongCover(d.thumbnail_url.replace('60x60','640x640')) }).catch(()=>{}) } }} style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#f0eff5', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '8px 10px', fontSize: 12, outline: 'none', marginTop: 6 }} />
             </div>
           </div>
         </div>
@@ -1556,13 +1512,11 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
   const [selectedBook, setSelectedBook] = useState(0)
   const [highlighted, setHighlighted] = useState('')
   const [reflection, setReflection] = useState('')
-  const reflectionIME = useIMEInput(reflection, setReflection)
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768)
   const [aiNotes, setAiNotes] = useState([
     { id: 1, text: '这段话让人想起里尔克的那句："谁在这时没有房屋，就不必建筑。" 也许真正的自由并非拥有选择，而是不再需要选择。', anchor: '第3段' },
   ])
   const [searchQuery, setSearchQuery] = useState('')
-  const bookSearchIME = useIMEInput(searchQuery, setSearchQuery)
   const bookImportRef = useRef(null)
 
   const books = [
@@ -1644,7 +1598,7 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
         <div style={{ padding: '0 24px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: w.cardBg, border: `0.5px solid ${w.border}`, borderRadius: 10, padding: '8px 12px' }}>
             <Search size={14} style={{ color: w.textLight }} />
-            <input value={searchQuery} onChange={bookSearchIME.handleChange} {...bookSearchIME.compositionProps} placeholder="搜索书籍或笔记..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: w.text, fontFamily: w.sans, width: '100%' }} />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜索书籍或笔记..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: w.text, fontFamily: w.sans, width: '100%' }} />
           </div>
         </div>
 
@@ -1831,7 +1785,7 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
               <div style={{ fontSize: 13, fontWeight: 600, color: w.accentDeep, marginBottom: 12 }}>
                 {mode === 'self' ? '📝 写下你的感悟' : `💬 与 ${aiName || 'Claude'} 交流`}
               </div>
-              <textarea value={reflection} onChange={reflectionIME.handleChange} {...reflectionIME.compositionProps} placeholder={mode === 'self' ? '这段文字让你想起了什么...' : `你想聊什么？选中文本也可以邀请 ${aiName || 'Claude'} 评论...`}
+              <textarea value={reflection} onChange={e => setReflection(e.target.value)} placeholder={mode === 'self' ? '这段文字让你想起了什么...' : `你想聊什么？选中文本也可以邀请 ${aiName || 'Claude'} 评论...`}
                 rows={3} style={{ width: '100%', background: w.sidebarBg, color: w.text, border: `0.5px solid ${w.border}`, borderRadius: 12, padding: 14, fontSize: 14, fontFamily: w.sans, resize: 'vertical', lineHeight: 1.6, outline: 'none' }} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                 <button style={{ background: w.accent, color: '#fff', border: 'none', borderRadius: 10, padding: '8px 20px', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1849,7 +1803,15 @@ function ReadingPage({ darkMode, onBack, aiAvatar, aiName, config }) {
 /* ============================================================
    Settings — iOS 风格设置页 (kimi-room 风格完整配置)
    ============================================================ */
-// Field 提取到外部，避免每次 SettingsPage re-render 时重建组件导致 IME 组字被打断
+// ★ 关键修复：Section / Field / Segmented 提取到函数外部，
+//   用 React.memo 包裹防止 SettingsPage 每次 re-render 时重建组件 → IME 被打断
+const SettingsSection = React.memo(({ title, children, ios }) => (
+  <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
+    <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>{title}</div>
+    {children}
+  </div>
+))
+
 const SettingsField = React.memo(({ label, value, onChange, placeholder, type = 'text', rows, ios }) => (
   <div style={{ marginBottom: rows ? 12 : 8 }}>
     <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 4 }}>{label}</div>
@@ -1920,13 +1882,6 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
     setSaved(true); setTimeout(() => setSaved(false), 1500)
   }
 
-  const Section = ({ title, children }) => (
-    <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 12, border: `0.5px solid ${ios.cardBorder}` }}>
-      <div style={{ fontSize: 13, color: ios.textMuted, fontWeight: 500, marginBottom: 10, letterSpacing: 0.5 }}>{title}</div>
-      {children}
-    </div>
-  )
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: ios.bg, color: ios.text, fontFamily: '-apple-system, sans-serif', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶栏 */}
@@ -1940,7 +1895,7 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 40px' }}>
         {/* —— 身份 —— */}
-        <Section title="身份">
+        <SettingsSection ios={ios} title="身份">
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center', marginBottom: 14 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div onClick={() => userRef.current?.click()} style={{ width: 52, height: 52, borderRadius: '50%', border: `2px dashed ${ios.inputBorder}`, overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: ios.inputBg }}>
@@ -1959,10 +1914,10 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
           </div>
           <SettingsField ios={ios} label={`TA 的名字（在 {{char}} 占位符中被替换）`} value={aiName} onChange={setAiName} placeholder="Bunny" />
           <SettingsField ios={ios} label={`你的名字（在 {{user}} 占位符中被替换）`} value={userName} onChange={setUserName} placeholder="你的名字" />
-        </Section>
+        </SettingsSection>
 
         {/* —— LLM 接口 —— */}
-        <Section title="LLM 接口">
+        <SettingsSection ios={ios} title="LLM 接口">
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 12, color: ios.textMuted, marginBottom: 6 }}>后端模式</div>
             <SettingsSegmented ios={ios} options={[{ id: 'api', name: 'API 模式' }, { id: 'cli', name: 'Claude Code (本地)' }]} value={backendMode} onChange={setBackendMode} />
@@ -1979,21 +1934,21 @@ function SettingsPage({ darkMode, onBack, userAvatar, aiAvatar, setUserAvatar, s
             <SettingsField ios={ios} label="Model" value={apiModel} onChange={setApiModel} placeholder="gpt-4o / claude-sonnet-4-20250514" />
             <SettingsField ios={ios} label="API Key" value={apiKey} onChange={setApiKey} placeholder="sk-..." type="password" />
           </>)}
-        </Section>
+        </SettingsSection>
 
         {/* —— 人设 —— */}
-        <Section title="人设">
+        <SettingsSection ios={ios} title="人设">
           <SettingsField ios={ios} label="性格描述" value={personality} onChange={setPersonality} placeholder="温柔、好奇、偶尔有点倔" />
           <SettingsField ios={ios} label="场景设定 (Scenario)" value={scenario} onChange={setScenario} placeholder="一只住在云上的兔子，有一个温暖的小窝..." rows={2} />
           <SettingsField ios={ios} label="系统提示词 (System Prompt)" value={systemPrompt} onChange={setSystemPrompt} placeholder="你是一个温暖的AI伙伴..." rows={4} />
           <div style={{ fontSize: 10, color: ios.textMuted, lineHeight: 1.4 }}>支持占位符：{'{{char}}'} = AI名字, {'{{user}}'} = 你的名字, {'{{time}}'} = 当前时间</div>
-        </Section>
+        </SettingsSection>
 
         {/* —— 关于 —— */}
-        <Section title="关于">
+        <SettingsSection ios={ios} title="关于">
           <div style={{ fontSize: 13, color: ios.text, lineHeight: 1.6 }}>Eidos — Relationship Operating System</div>
           <div style={{ fontSize: 11, color: ios.textMuted, marginTop: 4 }}>Version 0.1 · Built with ❤️</div>
-        </Section>
+        </SettingsSection>
 
         {/* 保存按钮 */}
         <button onClick={handleSave}
@@ -2028,8 +1983,6 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
   const [logged, setLogged] = useState(false)
   const [pwd, setPwd] = useState('')
   const [cookie, setCookie] = useState('')
-  const memorySearchIME = useIMEInput(searchQ, setSearchQ)
-  const memoryPwdIME = useIMEInput(pwd, setPwd)
   const [evoData, setEvoData] = useState(null)
   const [evoSection, setEvoSection] = useState('persona')
   const [loading, setLoading] = useState(false)
@@ -2149,7 +2102,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 14, border: `0.5px solid ${ios.cardBorder}` }}>
                 <div style={{ fontSize: 13, color: ios.textMuted, marginBottom: 8 }}>需要登录 Ombre Brain</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="password" value={pwd} onChange={memoryPwdIME.handleChange} {...memoryPwdIME.compositionProps} placeholder="密码"
+                  <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="密码"
                     style={{ flex: 1, background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                   <button onClick={handleLogin} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>登录</button>
                 </div>
@@ -2160,7 +2113,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: ios.inputBg, borderRadius: 8, padding: '8px 12px', border: `0.5px solid ${ios.inputBorder}` }}>
                   <Search size={14} style={{ color: ios.textMuted }} />
-                  <input value={searchQ} onChange={memorySearchIME.handleChange} {...memorySearchIME.compositionProps} onKeyDown={e => e.key === 'Enter' && handleSearch()} placeholder="搜索记忆..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: ios.text, width: '100%' }} />
+                  <input value={searchQ} onChange={e => setSearchQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} placeholder="搜索记忆..." style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: ios.text, width: '100%' }} />
                 </div>
                 <button onClick={handleSearch} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>搜索</button>
               </div>
@@ -2184,7 +2137,7 @@ function MemoryPage({ darkMode, onBack, aiAvatar }) {
               <div style={{ background: ios.cardBg, borderRadius: 12, padding: 16, marginBottom: 14, border: `0.5px solid ${ios.cardBorder}` }}>
                 <div style={{ fontSize: 13, color: ios.textMuted, marginBottom: 8 }}>需要登录 Ombre Brain 查看进化数据</div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <input type="password" value={pwd} onChange={memoryPwdIME.handleChange} {...memoryPwdIME.compositionProps} placeholder="密码"
+                  <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="密码"
                     style={{ flex: 1, background: ios.inputBg, color: ios.text, border: `0.5px solid ${ios.inputBorder}`, borderRadius: 8, padding: '8px 12px', fontSize: 13, outline: 'none' }} />
                   <button onClick={handleLogin} style={{ background: ios.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 13, cursor: 'pointer' }}>登录</button>
                 </div>
