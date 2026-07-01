@@ -1,3 +1,6 @@
+// ═══════════════════════════════════════════════════
+// Eidos Server — Build: 2026.07.01.v5
+// ═══════════════════════════════════════════════════
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'

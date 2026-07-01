@@ -1,3 +1,7 @@
+// ═══════════════════════════════════════════════════
+// Eidos — Relationship Operating System
+// Build: 2026.07.01.v5
+// ═══════════════════════════════════════════════════
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Send, Plus, MessageSquare, Settings, Trash2,

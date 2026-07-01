@@ -1,3 +1,4 @@
 {
-  "build_mode": "docker"
+  "build_mode": "docker",
+  "dockerfile": "Dockerfile"
 }

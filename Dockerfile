@@ -9,8 +9,8 @@ COPY client/package.json ./client/
 WORKDIR /app/client
 RUN npm install --legacy-peer-deps
 COPY client/ ./
-# 强制触碰源文件，确保 Vite 重新构建（绕过 Docker 缓存）
-RUN find src -type f -exec touch {} + && npm run build
+# ★ 清除旧构建产物，强制 Vite 从零重新构建
+RUN rm -rf dist && npm run build
 
 # ---- Server ----
 WORKDIR /app
